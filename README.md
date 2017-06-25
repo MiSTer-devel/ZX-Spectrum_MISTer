@@ -43,7 +43,7 @@ In normal mode, while TAP loading, the following keys can be used:
 
 OSD option **Fast tape load** increases CPU frequency to 56MHz while tape loading.
 
-Use **F10** key to switch into 48K basic (won't lock 48K mode) and automatically enter **LOAD ""** for games/apps which don't want to load from 128K menu.
+Use **F10** key to switch into 48K basic (won't lock 48K mode) and automatically enter **LOAD ""** if game/app doesn't load from 128K menu.
 
 ### Turbo modes
 You can control CPU speed by following keys:
