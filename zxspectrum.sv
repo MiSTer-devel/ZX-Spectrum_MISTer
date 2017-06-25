@@ -118,9 +118,9 @@ localparam CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OA,Model, Spectrum 128K, Spectrum 48K;",
+	"OAB,Memory,Spectrum 128K,Pentagon 256K,Scorpion 256K,Spectrum 48K;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
-	"V,v3.50.",`BUILD_DATE
+	"V,v3.60.",`BUILD_DATE
 };
 
 
@@ -304,8 +304,10 @@ T80pa cpu
 	.REG(cpu_reg)
 );
 
+wire ram_sel = |{addr[15:14],ram0};
+
 always_comb begin
-	casex({nMREQ, tape_dout_en, |addr[15:14], ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
+	casex({nMREQ, tape_dout_en, ram_sel, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
 		'b000XXXXXXX: cpu_din = rom_dout;
 		'b001XXXXXXX: cpu_din = ram_dout;
 		'b01XXXXXXXX: cpu_din = tape_dout;
@@ -339,19 +341,19 @@ end
 
 
 //////////////////   MEMORY   //////////////////
-reg  [16:0] ram_addr;
+reg  [17:0] ram_addr;
 wire  [7:0] ram_dout;
 wire [14:0] vram_addr;
 wire  [7:0] vram_dout;
 reg         ram_stb;
-wire        ram_we = |addr[15:14] & ~nMREQ & ~nWR;
+wire        ram_we = ram_sel & ~nMREQ & ~nWR;
 
 always_comb begin
 	casex(addr[15:14])
-		0: ram_addr = {            17'd0          };
-		1: ram_addr = {       3'd5,     addr[13:0]};
-		2: ram_addr = {       3'd2,     addr[13:0]};
-		3: ram_addr = {  page_reg[2:0], addr[13:0]};
+		0: ram_addr = {      4'd0, addr[13:0]};
+		1: ram_addr = {      4'd5, addr[13:0]};
+		2: ram_addr = {      4'd2, addr[13:0]};
+		3: ram_addr = {  page_ram, addr[13:0]};
 	endcase
 end
 
@@ -362,7 +364,7 @@ always @(posedge clk_sys) begin
 	ram_stb <= (~old_we && ram_we);
 end
 
-dpram #(8,17) ram 
+dpram #(8,18) ram 
 (
 	.clock(clk_sys),
 
@@ -399,7 +401,7 @@ dpram #(8,17,98304) rom
 
 	.address_b(ioctl_addr[16:0]),
 	.data_b(ioctl_dout),
-	.wren_b(ioctl_wr && !ioctl_index),
+	.wren_b(ioctl_wr & ioctl_download & !ioctl_index),
 	.q_b()
 );
 
@@ -407,12 +409,18 @@ dpram #(8,17,98304) rom
 /////////////////////////////////////////////////////////////////////////////
 
 reg        zx48;
+reg        p256;
+reg        s256;
 reg        page_scr_copy;
 reg        shadow_rom;
 reg  [7:0] page_reg;
 wire       page_disable = zx48 | page_reg[5];
 wire       page_scr     = page_reg[3];
-wire       page_write   = ~addr[15] & ~addr[1] & ~page_disable;
+wire       page_write   = ~addr[15] & (addr[14] | ~s256) & ~addr[1] & ~page_disable;
+
+reg        ram0;
+reg        page_128k;
+wire [3:0] page_ram = {page_128k, page_reg[2:0]};
 
 reg  [1:0] page_rom;
 always_comb begin
@@ -431,10 +439,14 @@ always @(posedge clk_sys) begin
 
 	if(reset) begin
 		page_scr_copy <= 0;
-		page_reg   <= 0;
+		page_reg    <= 0;
+		page_128k   <= 0;
+		ram0        <= 0;
 		page_reg[4] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
-		zx48  <= status[10];
+		p256  <= (status[11:10] == 1);
+		s256  <= (status[11:10] == 2);
+		zx48  <= (status[11:10] == 3);
 	end else begin
 		if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
 		if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66)) shadow_rom <= 1;
@@ -442,8 +454,10 @@ always @(posedge clk_sys) begin
 		if(io_wr & ~old_wr) begin
 			if(page_write) begin
 				page_reg  <= cpu_dout;
+				if(p256) page_128k <= cpu_dout[6];
 				if(~plusd_mem) page_scr_copy <= page_reg[3];
 			end
+			if(s256 & (addr == 'h1FFD) & ~page_disable) {page_128k,ram0} <= {cpu_dout[4],cpu_dout[0]};
 		end
 	end
 end
@@ -517,7 +531,7 @@ always_comb begin
 	endcase
 end
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_reg[2:0]), .scale(status[16:15]));
+video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]));
 
 
 ////////////////////   HID   ////////////////////
