@@ -199,12 +199,8 @@ always @(posedge clk_sys) begin
 			cpu_en  <= 0;
 			timeout <= 1;
 			turbo   <= turbo_req;
-		end else if(!cpu_en & !timeout & dram_ready) begin
+		end else if(!cpu_en & !timeout) begin
 			cpu_en  <= ~pause;
-		end else if(!dram_ready) begin
-			cpu_en  <= 0;
-		end else if(!dram_ready & tape_active) begin
-			cpu_en  <= 0;
 		end else if(cpu_en & pause) begin
 			cpu_en  <= 0;
 		end
@@ -240,6 +236,7 @@ wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
+wire        ioctl_wait;
 
 hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 (
@@ -696,7 +693,7 @@ smart_tape tape
 	.available(tape_loaded),
 	.req_hdr((reg_DE == 'h11) & !reg_A),
 
-	.buff_rd_en(~nRFSH),
+	.buff_rd_ack(dram_ready),
 	.buff_rd(tape_req),
 	.buff_addr(tape_addr),
 	.buff_din(tape_din),
@@ -730,6 +727,7 @@ end
 assign tape_in = tape_loaded_reg ? tape_vin : TAPE_IN;
 
 wire dram_ready;
+assign ioctl_wait = ioctl_download & ~dram_ready;
 
 
 `ifndef USE_DDR3

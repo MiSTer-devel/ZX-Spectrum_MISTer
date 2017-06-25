@@ -51,7 +51,7 @@ module tape
 
 	output reg    audio_out,
 
-	input         rd_en,
+	input         rd_ack,
 	output        rd,
 	output [24:0] addr,
 	input   [7:0] din
@@ -59,7 +59,7 @@ module tape
 
 localparam  CLOCK = 32'd3500000;
 
-assign rd   = rd_req & rd_en;
+assign rd   = rd_req;
 assign addr = size - read_cnt;
 assign dout = data;
 
@@ -70,7 +70,7 @@ reg         rd_req;
 reg  [24:0] size;
 
 always @(posedge clk_sys) begin
-	reg old_pause, old_prev, old_next, old_ready, old_rden;
+	reg old_pause, old_prev, old_next, old_ready, old_ack;
 
 	reg [24:0] blk_list[32];
 	reg        play_pause;
@@ -92,20 +92,18 @@ always @(posedge clk_sys) begin
 	reg  [4:0] blk_num;
 	reg        old_stdload;
 
-	old_rden <= rd_en;
+	old_ack <= rd_ack;
 
-	if(~rd_en) begin
-		if(rd_req) begin
-			if(old_rden) begin
-				if(~read_done) begin
-					din_r <= din;
-					read_done <= 1;
-				end
-				rd_req <= 0;
+	if(rd_req) begin
+		if(~old_ack & rd_ack) begin
+			if(~read_done) begin
+				din_r <= din;
+				read_done <= 1;
 			end
-		end else begin
-			rd_req <= ~read_done;
+			rd_req <= 0;
 		end
+	end else begin
+		rd_req <= ~read_done;
 	end
 
 	active <= !play_pause && read_cnt;
@@ -365,7 +363,7 @@ module smart_tape
 	output        active,
 	output        available,
 
-	input         buff_rd_en,
+	input         buff_rd_ack,
 	output        buff_rd,
 	output [24:0] buff_addr,
 	input   [7:0] buff_din,
@@ -408,7 +406,7 @@ tape tape
 	.addr(buff_addr),
 	.din(buff_din),
 	.dout(tape_dout),
-	.rd_en(buff_rd_en),
+	.rd_ack(buff_rd_ack),
 	.rd(buff_rd)
 );
 
