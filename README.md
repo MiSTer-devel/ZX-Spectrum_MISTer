@@ -43,6 +43,8 @@ In normal mode, while TAP loading, the following keys can be used:
 
 OSD option **Fast tape load** increases CPU frequency to 56MHz while tape loading.
 
+Use **F10** key to switch into 48K basic (won't lock 48K mode) and automatically enter **LOAD ""** for games/apps which don't want to load from 128K menu.
+
 ### Turbo modes
 You can control CPU speed by following keys:
 - F4 - normal speed (3.5MHz)
@@ -56,7 +58,7 @@ It's useful to switch to maximum speed when you are loading tape in normal mode.
 
 ### Memory Configurations with extra RAM:
 - **Pentagon 256K** uses bit 6 in port 7FFD to access additional memory.
-- **Scorpion 256K** uses bit 4 in port 1FFD to access additional memory, allows to use RAM on 0-3FFF (bit 0 in 1FFD)
+- **Scorpion 256K** uses bit 4 in port 1FFD to access additional memory, allows to use RAM in 0-3FFF (bit 0 in 1FFD)
 
 ### Mouse and Joystick:
 Kempston mouse has no strict convention which bit (D0 or D1) reflects a main button. After each reset, the first button pressed on mouse (left or right buttons only) will be represented by bit D0 (other button will be represented by bit D1). So, if you are not satisfied by mouse button map, then simply press reset and then press other button first.
