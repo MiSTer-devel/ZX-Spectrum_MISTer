@@ -54,7 +54,6 @@ You can control CPU speed by following keys:
 - F8 - 56MHz
 - F9 - pause/continue
 
-It's useful to switch to maximum speed when you are loading tape in normal mode. Due to SDRAM speed limitation 28MHz and 56MHz speeds include wait states, so effective CPU speed is lower than nominal.
 
 ### Memory Configurations with extra RAM:
 - **Pentagon 256K** uses bit 6 in port 7FFD to access additional memory.
