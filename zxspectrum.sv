@@ -20,6 +20,9 @@
 //  with this program; if not, write to the Free Software Foundation, Inc.,
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
+
+`define USE_DDR3
+
 module emu
 (
 	//Master input clock
@@ -115,7 +118,7 @@ localparam CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OAC,Memory,Standard 128K,Pentagon 512K,Profi 1024K,Standard 48K;",
+	"OA,Model, Spectrum 128K, Spectrum 48K;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
 	"V,v3.50.",`BUILD_DATE
 };
@@ -196,11 +199,11 @@ always @(posedge clk_sys) begin
 			cpu_en  <= 0;
 			timeout <= 1;
 			turbo   <= turbo_req;
-		end else if(!cpu_en & !timeout & ram_ready) begin
+		end else if(!cpu_en & !timeout & dram_ready) begin
 			cpu_en  <= ~pause;
-		end else if(!turbo[4:2] & !ram_ready) begin // SDRAM wait for 28MHz/56MHz turbo
+		end else if(!dram_ready) begin
 			cpu_en  <= 0;
-		end else if(!turbo[4:3] & !ram_ready & tape_active) begin // SDRAM wait for TAPE load on 14MHz
+		end else if(!dram_ready & tape_active) begin
 			cpu_en  <= 0;
 		end else if(cpu_en & pause) begin
 			cpu_en  <= 0;
@@ -305,17 +308,18 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
-		'b00XXXXXXX: cpu_din = ram_dout;
-		'b01XXXXXXX: cpu_din = tape_dout;
-		'b1X01XXXXX: cpu_din = fdd_dout;
-		'b1X001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joystick_0[5:0] | joystick_1[5:0]};
-		'b1X0001XXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1X000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1X0000101: cpu_din = ulap_dout;
-		'b1X0000100: cpu_din = port_ff;
-		'b1X00000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0]};
-		'b1X1XXXXXX: cpu_din = 8'hFF;
+	casex({nMREQ, tape_dout_en, |addr[15:14], ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
+		'b000XXXXXXX: cpu_din = rom_dout;
+		'b001XXXXXXX: cpu_din = ram_dout;
+		'b01XXXXXXXX: cpu_din = tape_dout;
+		'b1XX01XXXXX: cpu_din = fdd_dout;
+		'b1XX001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joystick_0[5:0] | joystick_1[5:0]};
+		'b1XX0001XXX: cpu_din = {page_scr_copy, 7'b1111111};
+		'b1XX000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
+		'b1XX0000101: cpu_din = ulap_dout;
+		'b1XX0000100: cpu_din = port_ff;
+		'b1XX00000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0]};
+		'b1XX1XXXXXX: cpu_din = 8'hFF;
 	endcase
 end
 
@@ -338,102 +342,80 @@ end
 
 
 //////////////////   MEMORY   //////////////////
-wire        dma = (reset | ~nBUSACK) & ~nBUSRQ;
-reg  [24:0] ram_addr;
-reg   [7:0] ram_din;
-reg         ram_we;
-reg         ram_rd;
+reg  [16:0] ram_addr;
 wire  [7:0] ram_dout;
-wire        ram_ready;
+wire [14:0] vram_addr;
+wire  [7:0] vram_dout;
+reg         ram_stb;
+wire        ram_we = |addr[15:14] & ~nMREQ & ~nWR;
 
 always_comb begin
-	casex({dma, tape_req, plusd_mem, mf128_mem, addr[15:14]})
-		'b1XXX_XX: ram_addr = ioctl_addr;
-		'b01XX_XX: ram_addr = tape_addr;
-		'b001X_00: ram_addr = {5'h18, 2'b00,    addr[13:0]};
-		'b0001_00: ram_addr = {5'h18, 2'b01,    addr[13:0]};
-		'b0000_00: ram_addr = {5'h17, page_rom, addr[13:0]};
-		'b00XX_01: ram_addr = {       3'd5,     addr[13:0]};
-		'b00XX_10: ram_addr = {       3'd2,     addr[13:0]};
-		'b00XX_11: ram_addr = {       page_ram, addr[13:0]};
-	endcase
-
-	casex({dma, tape_req})
-		'b1X: ram_din = ioctl_dout;
-		'b01: ram_din = 0;
-		'b00: ram_din = cpu_dout;
-	endcase
-
-	casex({dma, tape_req})
-		'b1X: ram_rd = 0;
-		'b01: ram_rd = ~nMREQ;
-		'b00: ram_rd = ~nMREQ & ~nRD;
-	endcase
-
-	casex({dma, tape_req})
-		'b1X: ram_we = ioctl_wr;
-		'b01: ram_we = 0;
-		'b00: ram_we = (addr[15] | addr[14] | ((plusd_mem | mf128_mem) & addr[13])) & ~nMREQ & ~nWR;
+	casex(addr[15:14])
+		0: ram_addr = {            17'd0          };
+		1: ram_addr = {       3'd5,     addr[13:0]};
+		2: ram_addr = {       3'd2,     addr[13:0]};
+		3: ram_addr = {  page_reg[2:0], addr[13:0]};
 	endcase
 end
 
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
-sdram ram
+always @(posedge clk_sys) begin
+	reg old_we;
+	
+	old_we <= ram_we;
+	ram_stb <= (~old_we && ram_we);
+end
+
+dpram #(8,17) ram 
 (
-	.*,
-	.init(~locked),
-	.clk(clk_sys),
-	.dout(ram_dout),
-	.din (ram_din),
-	.addr(ram_addr),
-	.wtbt(0),
-	.we(ram_we),
-	.rd(ram_rd),
-	.ready(ram_ready)
+	.clock(clk_sys),
+
+	.address_a(ram_addr),
+	.data_a(cpu_dout),
+	.wren_a(ram_stb),
+	.q_a(ram_dout),
+
+	.address_b({1'b1, vram_addr[14], 1'b1, vram_addr[13:0]}),
+	.data_b(0),
+	.wren_b(0),
+	.q_b(vram_dout)
 );
 
-/*
-assign {SDRAM_A, SDRAM_BA, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 6'b111111;
-assign SDRAM_DQ = {16{1'bZ}};
+wire [7:0] rom_dout;
+wire       rom_stb;
+wire       extmem_we = (plusd_mem | mf128_mem) & (addr[15:13] == 3'b001) & ~nMREQ & ~nWR;
 
-assign DDRAM_CLK = clk_sys;
-ddram ram
+always @(posedge clk_sys) begin
+	reg old_we;
+	
+	old_we <= extmem_we;
+	rom_stb <= (~old_we && extmem_we);
+end
+
+dpram #(8,17,98304) rom 
 (
-	.*,
-	.dout(ram_dout),
-	.din (ram_din),
-	.addr(ram_addr),
-	.we(ram_we),
-	.rd(ram_rd),
-	.ready(ram_ready)
+	.clock(clk_sys),
+
+	.address_a({(plusd_mem|mf128_mem) ? {2'b10, mf128_mem} : {1'b0, page_rom}, addr[13:0]}),
+	.data_a(cpu_dout),
+	.wren_a(rom_stb),
+	.q_a(rom_dout),
+
+	.address_b(ioctl_addr[16:0]),
+	.data_b(ioctl_dout),
+	.wren_b(ioctl_wr && !ioctl_index),
+	.q_b()
 );
-*/
+
 
 /////////////////////////////////////////////////////////////////////////////
 
-wire vram_we = (ram_addr[24:16] == 1) & ram_addr[14];
-wire [14:0] vram_addr;
-logic [7:0] vram_dout;
-
-always_ff@(posedge clk_sys) begin
-	logic [7:0] vram[32768];
-
-	if(ram_we & vram_we) vram[{ram_addr[15], ram_addr[13:0]}] <= ram_din;
-	vram_dout <= vram[vram_addr];
-end
-
-
 reg        zx48;
-reg        p512;
-reg        pf1024;
 reg        page_scr_copy;
 reg        shadow_rom;
 reg  [7:0] page_reg;
 wire       page_disable = zx48 | page_reg[5];
 wire       page_scr     = page_reg[3];
-wire [5:0] page_ram     = {page_128k, page_reg[2:0]};
 wire       page_write   = ~addr[15] & ~addr[1] & ~page_disable;
-reg  [2:0] page_128k;
 
 reg  [1:0] page_rom;
 always_comb begin
@@ -453,12 +435,9 @@ always @(posedge clk_sys) begin
 	if(reset) begin
 		page_scr_copy <= 0;
 		page_reg   <= 0;
-		page_128k  <= 0;
 		page_reg[4] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
-		p512  <= (status[12:10] == 1);
-		pf1024<= (status[12:10] == 2);
-		zx48  <= (status[12:10] == 3);
+		zx48  <= status[10];
 	end else begin
 		if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
 		if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66)) shadow_rom <= 1;
@@ -466,10 +445,8 @@ always @(posedge clk_sys) begin
 		if(io_wr & ~old_wr) begin
 			if(page_write) begin
 				page_reg  <= cpu_dout;
-				if(p512)  page_128k[1:0] <= cpu_dout[7:6];
 				if(~plusd_mem) page_scr_copy <= page_reg[3];
 			end
-			if(pf1024 & (addr == 'hDFFD)) page_128k <= cpu_dout[2:0];
 		end
 	end
 end
@@ -543,7 +520,7 @@ always_comb begin
 	endcase
 end
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]));
+video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_reg[2:0]), .scale(status[16:15]));
 
 
 ////////////////////   HID   ////////////////////
@@ -691,12 +668,12 @@ wd1793 #(1) fdd
 
 
 ///////////////////   TAPE   ///////////////////
-wire [24:0] tape_addr = 25'h400000 + tape_addr_raw;
-wire [24:0] tape_addr_raw;
+wire [24:0] tape_addr;
 wire        tape_req;
 wire        tape_dout_en;
 wire        tape_turbo;
 wire  [7:0] tape_dout;
+wire  [7:0] tape_din;
 wire        tape_led;
 wire        tape_active;
 wire        tape_loaded;
@@ -721,8 +698,8 @@ smart_tape tape
 
 	.buff_rd_en(~nRFSH),
 	.buff_rd(tape_req),
-	.buff_addr(tape_addr_raw),
-	.buff_din(ram_dout),
+	.buff_addr(tape_addr),
+	.buff_din(tape_din),
 
 	.ioctl_download(ioctl_download & (ioctl_index[4:0] == 2)),
 	.tape_size(ioctl_addr - 25'h400000 + 1'b1),
@@ -751,5 +728,123 @@ always @(posedge clk_sys) begin
 end
 
 assign tape_in = tape_loaded_reg ? tape_vin : TAPE_IN;
+
+wire dram_ready;
+
+
+`ifndef USE_DDR3
+
+assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
+sdram tape_buff
+(
+	.*,
+	.init(~locked),
+	.clk(clk_sys),
+	.wtbt(0),
+
+	.addr(ioctl_download ? ioctl_addr : tape_addr),
+
+	.din(ioctl_dout),
+	.we(ioctl_wr & |ioctl_index[4:0]),
+
+	.dout(tape_din),
+	.rd(~ioctl_download & tape_req),
+
+	.ready(dram_ready)
+);
+
+`else
+
+assign {SDRAM_A, SDRAM_BA, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 6'b111111;
+assign SDRAM_DQ = {16{1'bZ}};
+
+assign DDRAM_CLK = clk_sys;
+ddram tape_buff
+(
+	.*,
+	.addr(ioctl_download ? ioctl_addr : tape_addr),
+
+	.din(ioctl_dout),
+	.we(ioctl_wr & |ioctl_index[4:0]),
+
+	.dout(tape_din),
+	.rd(~ioctl_download & tape_req),
+
+	.ready(dram_ready)
+);
+
+`endif
+
+
+endmodule
+
+module dpram #(parameter DATAWIDTH=8, ADDRWIDTH=8, NUMWORDS=1<<ADDRWIDTH)
+(
+	input	                     clock,
+
+	input	     [ADDRWIDTH-1:0] address_a,
+	input	     [DATAWIDTH-1:0] data_a,
+	input	                     wren_a,
+	output reg [DATAWIDTH-1:0] q_a,
+
+	input	     [ADDRWIDTH-1:0] address_b,
+	input	     [DATAWIDTH-1:0] data_b,
+	input	                     wren_b,
+	output reg [DATAWIDTH-1:0] q_b
+);
+
+altsyncram	altsyncram_component (
+			.address_a (address_a),
+			.address_b (address_b),
+			.clock0 (clock),
+			.data_a (data_a),
+			.data_b (data_b),
+			.wren_a (wren_a),
+			.wren_b (wren_b),
+			.q_a (q_a),
+			.q_b (q_b),
+			.aclr0 (1'b0),
+			.aclr1 (1'b0),
+			.addressstall_a (1'b0),
+			.addressstall_b (1'b0),
+			.byteena_a (1'b1),
+			.byteena_b (1'b1),
+			.clock1 (1'b1),
+			.clocken0 (1'b1),
+			.clocken1 (1'b1),
+			.clocken2 (1'b1),
+			.clocken3 (1'b1),
+			.eccstatus (),
+			.rden_a (1'b1),
+			.rden_b (1'b1));
+defparam
+	altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK0",
+	altsyncram_component.address_reg_b = "CLOCK0",
+	altsyncram_component.indata_reg_b = "CLOCK0",
+	altsyncram_component.numwords_a = NUMWORDS,
+	altsyncram_component.numwords_b = NUMWORDS,
+	altsyncram_component.widthad_a = ADDRWIDTH,
+	altsyncram_component.widthad_b = ADDRWIDTH,
+	altsyncram_component.width_a = DATAWIDTH,
+	altsyncram_component.width_b = DATAWIDTH,
+	altsyncram_component.width_byteena_a = 1,
+	altsyncram_component.width_byteena_b = 1,
+
+	altsyncram_component.clock_enable_input_a = "BYPASS",
+	altsyncram_component.clock_enable_input_b = "BYPASS",
+	altsyncram_component.clock_enable_output_a = "BYPASS",
+	altsyncram_component.clock_enable_output_b = "BYPASS",
+	altsyncram_component.intended_device_family = "Cyclone V",
+	altsyncram_component.lpm_type = "altsyncram",
+	altsyncram_component.operation_mode = "BIDIR_DUAL_PORT",
+	altsyncram_component.outdata_aclr_a = "NONE",
+	altsyncram_component.outdata_aclr_b = "NONE",
+	altsyncram_component.outdata_reg_a = "UNREGISTERED",
+	altsyncram_component.outdata_reg_b = "UNREGISTERED",
+	altsyncram_component.power_up_uninitialized = "FALSE",
+	altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+	altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
+	altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ";
+
 
 endmodule
