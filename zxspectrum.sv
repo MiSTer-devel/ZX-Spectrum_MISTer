@@ -120,7 +120,8 @@ localparam CONF_STR = {
 	"-;",
 	"OAB,Memory,Spectrum 128K,Pentagon 256K,Scorpion 256K,Spectrum 48K;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
-	"V,v3.60.",`BUILD_DATE
+	"J,Fire 1,Fire 2;",
+	"V,v3.61.",`BUILD_DATE
 };
 
 
@@ -214,8 +215,8 @@ wire        ps2_kbd_data;
 wire        ps2_mouse_clk;
 wire        ps2_mouse_data;
 
-wire  [7:0] joystick_0;
-wire  [7:0] joystick_1;
+wire [15:0] joystick_0;
+wire [15:0] joystick_1;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [31:0] status;
@@ -324,9 +325,9 @@ end
 
 reg init_reset = 1;
 always @(posedge clk_sys) begin
-	reg old_download;
-	old_download <= ioctl_download;
-	if(old_download & ~ioctl_download) init_reset <= 0;
+	reg old_rst = 0;
+	old_rst <= status[0];
+	if(old_rst & ~status[0]) init_reset <= 0;
 end
 
 reg NMI;
@@ -390,7 +391,7 @@ always @(posedge clk_sys) begin
 	rom_stb <= (~old_we && extmem_we);
 end
 
-dpram #(8,17,98304) rom 
+dpram #(8,17,98304,"bios.mif") rom 
 (
 	.clock(clk_sys),
 
@@ -790,7 +791,7 @@ ddram tape_buff
 
 endmodule
 
-module dpram #(parameter DATAWIDTH=8, ADDRWIDTH=8, NUMWORDS=1<<ADDRWIDTH)
+module dpram #(parameter DATAWIDTH=8, ADDRWIDTH=8, NUMWORDS=1<<ADDRWIDTH, INITFILE="")
 (
 	input	                     clock,
 
@@ -842,6 +843,7 @@ defparam
 	altsyncram_component.width_byteena_a = 1,
 	altsyncram_component.width_byteena_b = 1,
 
+	altsyncram_component.init_file = INITFILE, 
 	altsyncram_component.clock_enable_input_a = "BYPASS",
 	altsyncram_component.clock_enable_input_b = "BYPASS",
 	altsyncram_component.clock_enable_output_a = "BYPASS",
