@@ -15,7 +15,6 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Memory snapshot save/load in +D and Multiface.
 - Native TAP with turbo loading. Fast loading for TAP and CSW.
 - Kempston Mouse and Joystick.
-- Audio in from real [tape device](http://www.atari-forum.com/viewtopic.php?p=298401#p298401)
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.
