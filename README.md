@@ -19,8 +19,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.
-Copy [spectrum.rom](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/rom) file to the root of SD card.
-**Note:** always update spectrum.rom together with core to make sure you're using compatible ROM version. ROM is not always compatible with all releases (but always compatible with latest release), thus you need to keep the ROM if you want to use older version of core.
+New versions already integrate ROM inside. So if you've used an older version where external spectrum.rom was required, then please remove spectrum.rom, otherwise it will be loaded which probably is older version than already included inside the core.
 
 ### Notes about supported formats:
 **TRD** is TR-DOS image used with Beta Disk Interface (BDI). To use TR-DOS you need to choose TRD image in OSD first. In 128K mode use menu to enter TR-DOS. In 48K mode use command **RANDOMIZE USR 15616** to enter TR-DOS. Use command **RETURN** to leave TR-DOS.
