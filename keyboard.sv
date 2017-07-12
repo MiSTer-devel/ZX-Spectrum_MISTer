@@ -298,7 +298,7 @@ always @(posedge clk_sys) begin
 						release_btn <= action;
 						code <= kcode;
 						input_strobe <= 1;
-						if((kcode == 9) && !mod && action) auto_pos <= 1; // F10
+						if((kcode == 9) && action) auto_pos <= 1; // F10
 					end
 				end else begin
 					shift_reg <= kdata;

@@ -435,9 +435,14 @@ always_comb begin
 end
 
 always @(posedge clk_sys) begin
-	reg old_wr, old_m1;
+	reg old_wr, old_m1, old_reset;
+	reg [2:0] rmod;
+
 	old_wr <= io_wr;
 	old_m1 <= m1;
+	
+	old_reset <= reset;
+	if(~old_reset & reset) rmod <= mod;
 
 	if(reset) begin
 		page_scr_copy <= 0;
@@ -446,9 +451,15 @@ always @(posedge clk_sys) begin
 		ram0        <= 0;
 		page_reg[4] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
-		p256  <= (status[11:10] == 1);
-		s256  <= (status[11:10] == 2);
-		zx48  <= (status[11:10] == 3);
+		if(Fn[10] && (rmod == 1)) begin
+			p256  <= 0;
+			s256  <= 0;
+			zx48  <= 1;
+		end else begin
+			p256  <= (status[11:10] == 1);
+			s256  <= (status[11:10] == 2);
+			zx48  <= (status[11:10] == 3);
+		end
 	end else begin
 		if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
 		if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66)) shadow_rom <= 1;
