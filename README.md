@@ -14,7 +14,9 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Multiface 128 add-on.
 - Memory snapshot save/load in +D and Multiface.
 - Native TAP with turbo loading. Fast loading for TAP and CSW.
-- Kempston Mouse and Joystick.
+- Kempston Mouse.
+- Kempston Joystick (as joystick 1).
+- Sinclair Joystick I (as joystick 2).
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.
