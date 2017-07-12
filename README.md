@@ -82,6 +82,7 @@ You can enter Multiface ROM using **RShift+F11**. Multiface 128 includes preload
 - Ctrl+F11 - warm reset
 - Alt+F11 - cold reset will disk unload
 - Ctrl+Alt+F11 - reset to ROM0 menu
+- F10 - switch to Basic 48 (without 48K lock) and issue **LOAD""**
 - F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted)
 - RShift+F11 - enter Multiface 128 menu
 - F12 - OSD menu
