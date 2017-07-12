@@ -231,6 +231,7 @@ wire  [7:0] sd_buff_din;
 wire        sd_buff_wr;
 wire        img_mounted;
 wire [63:0] img_size;
+wire        img_readonly;
 
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
@@ -587,6 +588,7 @@ wire        fdd_intrq;
 wire        fdd_drq;
 wire        fdd_sel  = trdos_en & addr[2] & addr[1];
 wire  [7:0] fdd_dout = (addr[7] & ~plusd_en) ? {fdd_intrq, fdd_drq, 6'h3F} : wd_dout;
+reg         fdd_ro;
 
 //
 // current +D implementation notes:
@@ -613,6 +615,7 @@ always @(posedge clk_sys) begin
 
 	old_mounted <= img_mounted;
 	if(~old_mounted & img_mounted) begin
+		fdd_ro    <= img_readonly;
 		fdd_ready <= 1;
 		plusd_en  <= |ioctl_index[7:6];
 	end
@@ -664,7 +667,7 @@ wd1793 #(1) fdd
 	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr),
 
-	.wp(0),
+	.wp(fdd_ro),
 
 	.size_code(plusd_en ? 3'd4 : 3'd1),
 	.layout(ioctl_index[7:6] == 1),
