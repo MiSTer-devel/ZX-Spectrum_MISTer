@@ -108,6 +108,7 @@ always @(negedge clk_sys) begin
 
 		case(code)
 			8'h12 : keys[0][0] <= release_btn; // Left shift (CAPS SHIFT)
+			8'h59 : keys[0][0] <= release_btn; // Right shift (CAPS SHIFT)
 			8'h1a : keys[0][1] <= release_btn; // Z
 			8'h22 : keys[0][2] <= release_btn; // X
 			8'h21 : keys[0][3] <= release_btn; // C
