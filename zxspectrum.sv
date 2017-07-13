@@ -481,7 +481,7 @@ reg [2:0] border_color;
 reg       ear_out;
 reg       mic_out;
 
-wire ula_we = ~addr[0] & ~(tape_turbo | nIORQ) & ~nWR & nM1;
+wire ula_we = ~addr[0] & ~nIORQ & ~nWR & nM1;
 always @(posedge clk_sys) begin
 	reg old_we;
 	old_we <= ula_we;
