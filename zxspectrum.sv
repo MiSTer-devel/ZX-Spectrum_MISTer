@@ -225,13 +225,23 @@ wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [31:0] status;
 
-wire [31:0] sd_lba;
-wire        sd_rd;
-wire        sd_wr;
+wire 			sd_rd_plus3;
+wire 			sd_wr_plus3;
+wire [31:0] sd_lba_plus3;
+wire [7:0]  sd_buff_din_plus3;
+
+wire 			sd_rd_wd;
+wire 			sd_wr_wd;
+wire [31:0] sd_lba_wd;
+wire [7:0]  sd_buff_din_wd;
+
+wire [31:0] sd_lba = plus3_fdd_ready ? sd_lba_plus3 : sd_lba_wd;
+wire        sd_rd = plus3_fdd_ready ? sd_rd_plus3 : sd_rd_wd;
+wire        sd_wr = plus3_fdd_ready ? sd_wr_plus3 : sd_wr_wd;
 wire        sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din;
+wire  [7:0] sd_buff_din = plus3_fdd_ready ? sd_buff_din_plus3 : sd_buff_din_wd;
 wire        sd_buff_wr;
 wire        img_mounted;
 wire [63:0] img_size;
@@ -310,7 +320,7 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
 		'b00XXXXXXXX: cpu_din = ram_dout;
 		'b01XXXXXXXX: cpu_din = tape_dout;
 		'b1X01XXXXXX: cpu_din = fdd_dout;
@@ -621,8 +631,14 @@ reg         fdd_reset;
 wire        fdd_intrq;
 wire        fdd_drq;
 wire        fdd_sel  = trdos_en & addr[2] & addr[1];
-wire  [7:0] fdd_dout = (addr[7] & ~plusd_en) ? {fdd_intrq, fdd_drq, 6'h3F} : wd_dout;
 reg         fdd_ro;
+wire  [7:0] wdc_dout = (addr[7] & ~plusd_en) ? {fdd_intrq, fdd_drq, 6'h3F} : wd_dout;
+
+wire			plus3_fdd_ready;
+wire        plus3_fdd = ~addr[1] & addr[13] & ~addr[14] & ~addr[15] & plus3 & ~page_disable;
+wire [7:0]  u765_dout;
+
+wire  [7:0] fdd_dout = plus3_fdd ? u765_dout : wdc_dout; 
 
 //
 // current +D implementation notes:
@@ -650,8 +666,12 @@ always @(posedge clk_sys) begin
 	old_mounted <= img_mounted;
 	if(~old_mounted & img_mounted) begin
 		fdd_ro    <= img_readonly;
-		fdd_ready <= 1;
-		plusd_en  <= |ioctl_index[7:6];
+
+	   //Only TRDs on +3
+		fdd_ready <= (!ioctl_index[7:6] & plus3) | ~plus3;
+		plusd_en  <= |ioctl_index[7:6] & ~plus3;
+		//DSK only for +3
+		plus3_fdd_ready <= plus3 & (ioctl_index[7:6] == 2); 
 	end
 
 	old_rd <= io_rd;
@@ -692,13 +712,13 @@ wd1793 #(1) fdd
 
 	.img_mounted(img_mounted),
 	.img_size(img_size[19:0]),
-	.sd_lba(sd_lba),
-	.sd_rd(sd_rd),
-	.sd_wr(sd_wr),
+	.sd_lba(sd_lba_wd),
+	.sd_rd(sd_rd_wd),
+	.sd_wr(sd_wr_wd), 
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din),
+	.sd_buff_din(sd_buff_din_wd), 
 	.sd_buff_wr(sd_buff_wr),
 
 	.wp(fdd_ro),
@@ -715,6 +735,28 @@ wd1793 #(1) fdd
 	.buff_din(0)
 );
 
+
+u765 u765
+(
+	.clk_sys(clk_sys),
+	.reset(reset),
+	.a0(addr[12]),
+	.nRD(plus3_fdd & ~nIORQ & nM1 & nRD),
+	.nWR(plus3_fdd & ~nIORQ & nM1 & nWR),
+	.din(cpu_dout),
+	.dout(u765_dout),
+
+	.img_mounted(img_mounted),
+	.img_size(img_size),
+	.sd_lba(sd_lba_plus3),
+	.sd_rd(sd_rd_plus3),
+	.sd_wr(sd_wr_plus3),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din_plus3),
+	.sd_buff_wr(sd_buff_wr)
+);
 
 ///////////////////   TAPE   ///////////////////
 wire [24:0] tape_addr = 25'h400000 + tape_addr_raw;
