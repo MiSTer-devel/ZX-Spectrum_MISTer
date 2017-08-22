@@ -11,7 +11,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Original Tape loading through OSD (CSW files).
 - TR-DOS (Beta Disk Interface) and native TRD images.
 - G+DOS (MGT +D Disk Interface) and IMG, MGT images (only in none +2A/3 memory modes).
-- +3 Disk drive usable with +3DOS (read only at the moment).
+- +3 Disk drive usable with +3DOS.
 - Multiface 128 and Multiface 3 (in +3 mode) add-on.
 - Memory snapshot save/load in +D and Multiface.
 - Native TAP with turbo loading. Fast loading for TAP and CSW.
@@ -32,7 +32,7 @@ then issue **RANDOMIZE USR 15616**. Use command **RETURN** to leave TR-DOS.
 **MGT** is G+DOS and MasterDOS (SAM Coupe) image. It's similar to IMG but uses different layout. The main purpose is to transfer data to/from SAM Coupe.
 
 **DSK** +3 disk format. In none- +3 modes, +D tries to mount it, however +3 disk images are not compatible with G+DOS.
-***Note:*** in +3 mode, both the Beta and the +3 disk drive are supported, but only one image can be mounted, so both cannot be used at the same time.
+***Note:*** in +3 mode, both the Beta and the +3 disk drive are supported, but only one image can be mounted, so both cannot be used at the same time. Copy protected games are not working always (especially SpeedLock ones).
 
 **TAP** is simple tape dump format. It is possible to use normal and **turbo** loading (only if application uses standard loading routines from ROM). To load in turbo mode, you need to choose TAP file in OSD **first** and then start to load app through menu (128K) or by command **LOAD ""** (48K, 128K). To load TAP file in normal mode through internal AUDIO IN loop, you need to start loading through menu or command **first** and then choose TAP file though OSD. If application uses non-standard loader, then TAP file will be played in normal mode automatically. Thus it's safe to always choose the turbo mode. Some applications are split into several parts inside one TAP file. For example DEMO apps where each part is loaded after finish of previous part, or games loading levels by requests. The core pauses the TAP playback after each code part (flag=#255). If application uses standard loader from ROM, then everything will be handled automatically and unnoticeable. If app uses non-standard loader, then there is no way to detect the loading. In this case you need to press **F1 key** to continue/pause TAP playback. Do not press F1 key while data is loading (or you will have to reset and start from beginning). To help operate with TAP (for non-standard loaders) there is special yellow LED signaling:
 - LED is ON: more data is available in TAP file.
@@ -88,7 +88,6 @@ If you prefer to use bare Multiface 128 ROM then do following procedure: Press a
 You will be able to use bare Multiface ROM by simple subsequent presses of **RShift+F11** till core reload. Multiface provides snapshot functionality by saving to IMG/MGT disks. Please find and read Multiface 128 manual.
 **Note:** Multiface 128 expose its port, thus if game has protection against Multiface, it won't work, unless you press (o)ff before you exit from the Multiface menu. Thus using +D snapshot is prefered.
 When using the Spectrum +2A/3 mode, the Multiface 3 is supported. There's no Genie for the +3, but there are useful toolkit routines in the stock ROM.
-Unfortately save to disk doesn't work yet, since the FDC implementation is read-only currently.
 
 ### Special Keys:
 - Ctrl+F11 - warm reset
