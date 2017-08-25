@@ -181,7 +181,7 @@ always @(posedge clk_sys) begin
 	reg [26:0] timeout;
 	reg rw_deleted;
 	reg [7:0] m_status;  //main status register
-	reg [7:0] status[4]; //st0-3
+	reg [7:0] status[4] = '{0, 0, 0, 0}; //st0-3
 	reg [5:0] state, command;
 	reg [7:0] ncn; //new cylinder number
 	reg [7:0] pcn; //present cylinder number
@@ -281,6 +281,7 @@ always @(posedge clk_sys) begin
 						image_ready <= 1;
 						image_scan_state <= 0;
 						status[3][UPD765_ST3_WP] <= 0;
+						{ds0, ncn, pcn, c, h, r, n} <= 0;
 					end
 				end
 				buff_addr <= buff_addr + 1'd1;
@@ -292,16 +293,16 @@ always @(posedge clk_sys) begin
 	endcase
 
 	//the FDC
-   if (reset) begin
+   if (reset & ~image_scan_state) begin
 		m_status <= 8'h80;
 		state <= COMMAND_IDLE;
 		status[0] <= 0;
 		status[1] <= 0;
 		status[2] <= 0;
-		status[3] <= 8'h50;
+		status[3][UPD765_ST3_WP] <= ~image_ready;
+		status[3][UPD765_ST3_T0] <= 1;
 		{ds0, ncn, pcn, c, h, r, n} <= 0;
 		int_state<=0;
-		{image_ready, image_scan_state} <= 0;
 		{ack, sd_wr, sd_rd, sd_busy} <= 0;
 		image_track_offsets_wr <= 0;
 	end else begin

@@ -634,7 +634,7 @@ wire        fdd_sel  = trdos_en & addr[2] & addr[1];
 reg         fdd_ro;
 wire  [7:0] wdc_dout = (addr[7] & ~plusd_en) ? {fdd_intrq, fdd_drq, 6'h3F} : wd_dout;
 
-wire			plus3_fdd_ready;
+reg         plus3_fdd_ready;
 wire        plus3_fdd = ~addr[1] & addr[13] & ~addr[14] & ~addr[15] & plus3 & ~page_disable;
 wire [7:0]  u765_dout;
 
@@ -660,7 +660,7 @@ always @(posedge clk_sys) begin
 	reg old_mounted;
 	reg old_m1;
 
-	if(cold_reset) {fdd_ready, plusd_en} <= 0;
+	if(cold_reset) {plus3_fdd_ready, fdd_ready, plusd_en} <= 0;
 	if(reset)      {plusd_mem, trdos_en} <= 0;
 
 	old_mounted <= img_mounted;
