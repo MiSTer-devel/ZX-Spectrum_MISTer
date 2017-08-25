@@ -207,18 +207,14 @@ always @(posedge clk) begin
 			// Priority is to issue a refresh if one is outstanding
 			if(refresh_count > (cycles_per_refresh<<1)) state <= STATE_IDLE_1;
 			else if(new_rd | new_we) begin
-				new_rd      <= 0;
-				save_addr   <= addr;
-				if(~new_we & ~save_we & (save_addr[24:1] == addr[24:1])) begin
-					ready    <= 1;
-				end else begin
-					new_we   <= 0;
-					save_we  <= new_we;
-					state    <= STATE_OPEN_1;
-					command  <= CMD_ACTIVE;
-					SDRAM_A  <= addr[13:1];
-					SDRAM_BA <= addr[24:23];
-				end
+				new_we   <= 0;
+				new_rd   <= 0;
+				save_addr<= addr;
+				save_we  <= new_we;
+				state    <= STATE_OPEN_1;
+				command  <= CMD_ACTIVE;
+				SDRAM_A  <= addr[13:1];
+				SDRAM_BA <= addr[24:23];
 			end
 		end
 
@@ -257,7 +253,10 @@ always @(posedge clk) begin
 	if(we & ~old_we) {ready, new_we, new_data, new_wtbt} <= {1'b0, 1'b1, din, wtbt};
 
 	old_rd <= rd;
-	if(rd & ~old_rd) {ready, new_rd} <= {1'b0, 1'b1};
+	if(rd & ~old_rd) begin
+		if(ready & ~save_we & (save_addr[24:1] == addr[24:1])) save_addr <= addr;
+			else {ready, new_rd} <= {1'b0, 1'b1};
+	end
 end
 
 endmodule
