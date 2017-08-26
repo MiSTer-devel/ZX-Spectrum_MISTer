@@ -320,18 +320,19 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
-		'b00XXXXXXXX: cpu_din = ram_dout;
-		'b01XXXXXXXX: cpu_din = tape_dout;
-		'b1X01XXXXXX: cpu_din = fdd_dout;
-		'b1X001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
-		'b1X0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joystick_0[5:0]};
-		'b1X00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1X0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1X00000101: cpu_din = ulap_dout;
-		'b1X00000100: cpu_din = port_ff;
-		'b1X000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & ({5{addr[12]}} | ~{joystick_1[1:0], joystick_1[2], joystick_1[3], joystick_1[4]})};
-		'b1X1XXXXXXX: cpu_din = 8'hFF;
+	casex({nMREQ, tape_dout_en, rom_sel, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
+		'b01XXXXXXXXX: cpu_din = tape_dout;
+		'b000XXXXXXXX: cpu_din = ram_dout;
+		'b001XXXXXXXX: cpu_din = rom_dout;
+		'b1XX01XXXXXX: cpu_din = fdd_dout;
+		'b1XX001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
+		'b1XX0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joystick_0[5:0]};
+		'b1XX00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
+		'b1XX0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
+		'b1XX00000101: cpu_din = ulap_dout;
+		'b1XX00000100: cpu_din = port_ff;
+		'b1XX000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & ({5{addr[12]}} | ~{joystick_1[1:0], joystick_1[2], joystick_1[3], joystick_1[4]})};
+		'b1XX1XXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
 
@@ -424,6 +425,20 @@ dpram #(.ADDRWIDTH(15)) vram
     .q_b(vram_dout)
 );
 
+wire  [7:0] rom_dout;
+wire        rom_sel = ram_addr[20] & ~ram_addr[19] & ram_addr[18];
+dpram #(.ADDRWIDTH(18), .MEM_INIT_FILE("bios.mif")) rom
+(
+    .clock(clk_sys),
+	 .address_a(ram_addr[17:0]),
+	 .data_a(ram_din),
+	 .wren_a(rom_sel && ram_we),
+	 .q_a(rom_dout),
+	 
+	 .address_b(0),
+	 .data_b(0),
+	 .wren_b(0)
+);
 
 reg        zx48;
 reg        p512;
@@ -471,12 +486,12 @@ always @(posedge clk_sys) begin
 		page_reg_plus3 <= 0; 
 		page_128k   <= 0;
 		page_reg[4] <= Fn[10];
+		page_reg_plus3[2] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
 		if(Fn[10] && (rmod == 1)) begin
 			p512   <= 0;
 			pf1024 <= 0;
-			plus3  <= 0;
-			zx48   <= 1;
+			zx48   <= ~plus3;
 		end else begin
 			p512  <= (status[12:10] == 1);
 			pf1024<= (status[12:10] == 2);
@@ -747,7 +762,7 @@ u765 u765
 	.dout(u765_dout),
 
 	.img_mounted(img_mounted),
-	.img_size(img_size),
+	.img_size(img_size[19:0]),
 	.sd_lba(sd_lba_plus3),
 	.sd_rd(sd_rd_plus3),
 	.sd_wr(sd_wr_plus3),
@@ -824,38 +839,72 @@ endmodule
 
 module dpram #(parameter DATAWIDTH=8, ADDRWIDTH=8, NUMWORDS=1<<ADDRWIDTH, MEM_INIT_FILE="")
 (
-	input	                     clock,
+	input	                 clock,
 
-	input	     [ADDRWIDTH-1:0] address_a,
-	input	     [DATAWIDTH-1:0] data_a,
-	input	                     wren_a,
-	output reg [DATAWIDTH-1:0] q_a,
+	input	 [ADDRWIDTH-1:0] address_a,
+	input	 [DATAWIDTH-1:0] data_a,
+	input	                 wren_a,
+	output [DATAWIDTH-1:0] q_a,
 
-	input	     [ADDRWIDTH-1:0] address_b,
-	input	     [DATAWIDTH-1:0] data_b,
-	input	                     wren_b,
-	output reg [DATAWIDTH-1:0] q_b
+	input	 [ADDRWIDTH-1:0] address_b,
+	input	 [DATAWIDTH-1:0] data_b,
+	input	                 wren_b,
+	output [DATAWIDTH-1:0] q_b
 );
 
-logic [DATAWIDTH-1:0] ram[0:NUMWORDS-1];
-initial if (MEM_INIT_FILE != "") $readmemh(MEM_INIT_FILE, ram);
+altsyncram	altsyncram_component (
+			.address_a (address_a),
+			.address_b (address_b),
+			.clock0 (clock),
+			.data_a (data_a),
+			.data_b (data_b),
+			.wren_a (wren_a),
+			.wren_b (wren_b),
+			.q_a (q_a),
+			.q_b (q_b),
+			.aclr0 (1'b0),
+			.aclr1 (1'b0),
+			.addressstall_a (1'b0),
+			.addressstall_b (1'b0),
+			.byteena_a (1'b1),
+			.byteena_b (1'b1),
+			.clock1 (1'b1),
+			.clocken0 (1'b1),
+			.clocken1 (1'b1),
+			.clocken2 (1'b1),
+			.clocken3 (1'b1),
+			.eccstatus (),
+			.rden_a (1'b1),
+			.rden_b (1'b1));
+defparam
+	altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK0",
+	altsyncram_component.address_reg_b = "CLOCK0",
+	altsyncram_component.indata_reg_b = "CLOCK0",
+	altsyncram_component.numwords_a = NUMWORDS,
+	altsyncram_component.numwords_b = NUMWORDS,
+	altsyncram_component.widthad_a = ADDRWIDTH,
+	altsyncram_component.widthad_b = ADDRWIDTH,
+	altsyncram_component.width_a = DATAWIDTH,
+	altsyncram_component.width_b = DATAWIDTH,
+	altsyncram_component.width_byteena_a = 1,
+	altsyncram_component.width_byteena_b = 1,
 
-always_ff@(posedge clock) begin
-	if(wren_a) begin
-		ram[address_a] <= data_a;
-		q_a <= data_a;
-	end else begin
-		q_a <= ram[address_a];
-	end
-end
+	altsyncram_component.init_file = MEM_INIT_FILE, 
+	altsyncram_component.clock_enable_input_a = "BYPASS",
+	altsyncram_component.clock_enable_input_b = "BYPASS",
+	altsyncram_component.clock_enable_output_a = "BYPASS",
+	altsyncram_component.clock_enable_output_b = "BYPASS",
+	altsyncram_component.intended_device_family = "Cyclone V",
+	altsyncram_component.lpm_type = "altsyncram",
+	altsyncram_component.operation_mode = "BIDIR_DUAL_PORT",
+	altsyncram_component.outdata_aclr_a = "NONE",
+	altsyncram_component.outdata_aclr_b = "NONE",
+	altsyncram_component.outdata_reg_a = "UNREGISTERED",
+	altsyncram_component.outdata_reg_b = "UNREGISTERED",
+	altsyncram_component.power_up_uninitialized = "FALSE",
+	altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+	altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
+	altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ";
 
-always_ff@(posedge clock) begin
-	if(wren_b) begin
-		ram[address_b] <= data_b;
-		q_b <= data_b;
-	end else begin
-		q_b <= ram[address_b];
-	end
-end
 
 endmodule
