@@ -21,8 +21,6 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.
-Copy spectrum.rom file to the root of SD card.
-**Note:** always update spectrum.rom together with core to make sure you're using compatible ROM version. ROM is not always compatible with all releases (but always compatible with latest release), thus you need to keep the ROM if you want to use older version of core.
 
 ### Notes about supported formats:
 **TRD** is TR-DOS image used with Beta Disk Interface (BDI). To use TR-DOS you need to choose TRD image in OSD first. In 128K mode use menu to enter TR-DOS.
