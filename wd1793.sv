@@ -206,6 +206,9 @@ reg			s_lostdata, s_wrfault; 			     // mode 2,3
 // Command mode 0/1 for status register
 reg 			cmd_mode;
 
+// allow write protect flag
+reg 			s_wpe;
+
 // DRQ/BUSY are always going together
 reg	[1:0]	s_drq_busy;
 wire			s_drq  = s_drq_busy[1];
@@ -216,8 +219,8 @@ reg   [7:0] wdreg_track;
 reg   [7:0] wdreg_sector;
 reg   [7:0] wdreg_data;
 wire  [7:0] wdreg_status = cmd_mode == 0 ?
-	{~ready, s_readonly, s_headloaded, s_seekerr | ~ready, s_crcerr, !disk_track, s_index, s_busy}:
-	{~ready, s_readonly, s_wrfault,    s_seekerr | ~ready, s_crcerr, s_lostdata,  s_drq,   s_busy};
+	{~ready, s_readonly & s_wpe, s_headloaded, s_seekerr | ~ready, s_crcerr, !disk_track, s_index, s_busy}:
+	{~ready, s_readonly & s_wpe, s_wrfault,    s_seekerr | ~ready, s_crcerr, s_lostdata,  s_drq,   s_busy};
 
 reg   [7:0] read_addr[6];
 reg   [7:0] q;
@@ -323,6 +326,7 @@ always @(posedge clk_sys) begin
 		if(RWMODE) buff_wr <= 0;
 		state <= STATE_IDLE;
 		cmd_mode <= 0;
+		s_wpe <= 1;
 		{s_headloaded, s_seekerr, s_crcerr, s_intrq} <= 0;
 		{s_wrfault, s_lostdata} <= 0;
 		s_drq_busy <= 0;
@@ -606,6 +610,7 @@ always @(posedge clk_sys) begin
 						s_intrq <= 0;
 						if((state == STATE_IDLE) | (din[7:4] == 'hD)) begin
 							cmd_mode <= din[7];
+							s_wpe    <= ~din[7];
 							case (din[7:4])
 							'h0: 	// RESTORE
 								begin
@@ -677,6 +682,7 @@ always @(posedge clk_sys) begin
 									edsk_start  <= 0;
 									edsk_addr   <= 0;
 									state       <= STATE_SEARCH;
+									s_wpe       <= din[5];
 
 									if(s_readonly & din[5]) begin
 										s_wrfault <= 1;
@@ -718,6 +724,7 @@ always @(posedge clk_sys) begin
 								end
 							'hF:  // WRITE TRACK
 								begin
+									s_wpe <= din[5];
 									{s_wrfault,s_seekerr,s_crcerr,s_lostdata} <= 0;
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;
