@@ -367,7 +367,7 @@ always_comb begin
 	casex({dma, tape_req, page_special, addr[15:14]})
 		'b1X_X_XX: ram_addr = ioctl_addr;
 		'b01_X_XX: ram_addr = tape_addr;
-		'b00_0_00: ram_addr = { 3'b101, page_rom,    addr[13:0]}; //ROM
+		'b00_0_00: ram_addr = { 4'b1000, page_rom,   addr[13:0]}; //ROM
 		'b00_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
 		'b00_0_10: ram_addr = {        3'd2,         addr[13:0]};
 		'b00_0_11: ram_addr = {    page_ram,         addr[13:0]};
@@ -426,8 +426,8 @@ dpram #(.ADDRWIDTH(15)) vram
 );
 
 wire  [7:0] rom_dout;
-wire        rom_sel = ram_addr[20] & ~ram_addr[19] & ram_addr[18];
-dpram #(.ADDRWIDTH(18), .MEM_INIT_FILE("bios.mif")) rom
+wire        rom_sel = (ram_addr[24:18] == 'b1000);
+dpram #(.ADDRWIDTH(18), .NUMWORDS(180224), .MEM_INIT_FILE("bios.mif")) rom
 (
     .clock(clk_sys),
 	 .address_a(ram_addr[17:0]),
@@ -461,12 +461,12 @@ wire       active_48_rom = zx48 | (page_reg[4] & ~plus3) | (plus3 & page_reg[4] 
 
 always_comb begin
 	casex({shadow_rom, trdos_en, plusd_mem, mf128_mem, plus3})
-		'b1XXXX: page_rom <= 4'b0100; //shadow
-		'b01XXX: page_rom <= 4'b0101; //trdos
-		'b001XX: page_rom <= 4'b1100; //plusd
-		'b0001X: page_rom <= { 2'b11, plus3, ~plus3 }; //MF128/+3
-		'b00001: page_rom <= { 2'b10, page_reg_plus3[2], page_reg[4] }; //+3
-		'b00000: page_rom <= { 3'b011, zx48 | page_reg[4] }; //up to +2
+		'b1XXXX: page_rom <=   4'b0000; //shadow
+		'b01XXX: page_rom <=   4'b0001; //trdos
+		'b001XX: page_rom <=   4'b1000; //plusd
+		'b0001X: page_rom <= { 2'b10, plus3, ~plus3 }; //MF128/+3
+		'b00001: page_rom <= { 2'b01, page_reg_plus3[2], page_reg[4] }; //+3
+		'b00000: page_rom <= { 3'b001, zx48 | page_reg[4] }; //up to +2
 	endcase
 end
 
