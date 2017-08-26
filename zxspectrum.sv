@@ -118,7 +118,7 @@ localparam CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OAC,Memory,Standard 128K,Pentagon 512K,Profi 1024K,Standard 48K,+2A/+3;"
+	"OAC,Memory,Spectrum 128K/+2,Pentagon 512K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
 	"J,Fire 1,Fire 2;",
 	"V,v3.70.",`BUILD_DATE
