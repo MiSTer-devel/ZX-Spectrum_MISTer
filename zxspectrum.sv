@@ -104,9 +104,10 @@ assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3;
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
+localparam CONF_PLUS3 = "(+3) ";
 
 `include "build_id.v"
-localparam CONF_STR = {
+localparam CONF_STR1 = {
 	"SPECTRUM;;",
 	"-;",
 	"S,TRDIMGDSKMGT,Load Disk;",
@@ -118,8 +119,12 @@ localparam CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OAC,Memory,Spectrum 128K/+2,Pentagon 512K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
+	"OAC,Memory,Spectrum 128K/+2,Pentagon 512K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
+};
+
+localparam CONF_STR2 = {
+	"2,Reset & apply;",
 	"J,Fire 1,Fire 2;",
 	"V,v3.70.",`BUILD_DATE
 };
@@ -252,10 +257,10 @@ wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
-hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
+hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 (
 	.*,
-	.conf_str({CONF_STR, plusd_en ? CONF_PLUSD : CONF_BDI}),
+	.conf_str({CONF_STR1, need_apply ? "T" : "+", CONF_STR2, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
 	.sd_conf(0),
 	.ioctl_wait(0),
 	.sd_ack_conf(),
@@ -266,6 +271,13 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 	.joystick_analog_0(),
 	.joystick_analog_1()
 );
+
+reg  [2:0] cur_mode = 0;
+wire       need_apply = status[12:10] != cur_mode;
+
+always @(posedge clk_sys) begin
+	if(reset) cur_mode <= status[12:10];
+end
 
 
 ///////////////////   CPU   ///////////////////
@@ -281,7 +293,7 @@ wire        nRFSH;
 wire        nBUSACK;
 wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
-wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10];
+wire        reset  = buttons[1] | status[0] | status[2] | cold_reset | warm_reset | shdw_reset | Fn[10];
 
 wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
