@@ -21,10 +21,8 @@
 //============================================================================
 
 //TODO:
-//better SpeedLock support
 //sk, mt flags for READ
 //WRITE DELETE should write the Deleted Address Mark to the SectorInfo
-//READ TRACK command
 //SCAN commands
 //time-accurate SEEK (based on the head stepping rate)
 //real FORMAT (but this would require squeezing/expanding the image file)
@@ -79,6 +77,8 @@ typedef enum
 {
  COMMAND_IDLE,
 
+ COMMAND_READ_TRACK,
+
  COMMAND_WRITE_DELETED_DATA,
  COMMAND_WRITE_DATA,
 
@@ -95,12 +95,10 @@ typedef enum
  COMMAND_RW_DATA_EXEC7,
  COMMAND_RW_DATA_EXEC8,
 
- COMMAND_READ_TRACK,
- COMMAND_READ_TRACK_EXEC,
-
  COMMAND_READ_ID,
  COMMAND_READ_ID_EXEC0,
  COMMAND_READ_ID_EXEC1,
+ COMMAND_READ_ID_EXEC2,
 
  COMMAND_FORMAT_TRACK,
  COMMAND_FORMAT_TRACK1,
@@ -192,7 +190,7 @@ always @(posedge clk_sys) begin
 	reg [7:0] sector_c, sector_h, sector_r, sector_n;
 	reg [7:0] sector_st1, sector_st2, total_sectors;
 	reg [15:0] sector_size;
-	reg [7:0] current_sector;
+	reg [7:0] current_sector, last_sector;
 	reg [14:0] bytes_to_read;
 	reg [2:0] substate;
 	reg [1:0] image_scan_state = 0;
@@ -201,7 +199,7 @@ always @(posedge clk_sys) begin
 	reg [5:0] ack;
 	reg sd_busy;
 	reg [26:0] timeout;
-	reg write, rw_deleted;
+	reg rtrack, write, rw_deleted;
 	reg [7:0] m_status;  //main status register
 	reg [7:0] status[4] = '{0, 0, 0, 0}; //st0-3
 	reg [5:0] state, command;
@@ -237,13 +235,9 @@ always @(posedge clk_sys) begin
 		image_size <= img_size[19:0];
 		image_scan_state<=1;
 		image_ready<=0;
-		pcn<=0;
-		ncn<=0;
-		c<=0;
-		h<=0;
-		r<=0;
-		n<=0;
+		{ds0, ncn, pcn, c, h, r, n} <= 0;
 		int_state<=0;
+		last_sector <= 0;
 	end
 
    //Process the image file
@@ -292,7 +286,6 @@ always @(posedge clk_sys) begin
 						image_scan_state <= 0;
 						status[3][UPD765_ST3_WP] <= 0;
 						status[3][UPD765_ST3_RDY] <= 1;
-						{ds0, ncn, pcn, c, h, r, n} <= 0;
 					end
 				end
 				buff_addr <= buff_addr + 1'd1;
@@ -404,6 +397,7 @@ always @(posedge clk_sys) begin
 
 			COMMAND_RECALIBRATE:
 			begin
+				last_sector <= 0;
 				if (~old_wr & wr & a0) begin
 					state <= COMMAND_IDLE;
 					ncn <= 0;
@@ -420,6 +414,7 @@ always @(posedge clk_sys) begin
 			begin
 				int_state <= 0;
 				m_status[UPD765_MAIN_CB] <= 1;
+				last_sector <= 0;
 				if (~old_wr & wr & a0) begin
 					hds <= din[2];
 					state <= COMMAND_SEEK_EXEC;
@@ -460,7 +455,7 @@ always @(posedge clk_sys) begin
 				sd_buff_type <= UPD765_SD_BUFF_TRACKINFO;
 				sd_rd <= 1;
 				sd_lba <= image_track_offsets_in[15:1];
-				buff_addr <= {image_track_offsets_in[0], 8'h18};
+				buff_addr <= {image_track_offsets_in[0], 8'h15}; //number of sectors
 				sd_busy <= 1;
 				state <= COMMAND_READ_ID_EXEC1;
 			end else begin
@@ -472,10 +467,17 @@ always @(posedge clk_sys) begin
 
 			COMMAND_READ_ID_EXEC1:
 			if (~sd_busy) begin
-				if (buff_addr[7:0] == 8'h18) sector_c <= buff_data_in;
-				else if (buff_addr[7:0] == 8'h19) sector_h <= buff_data_in;
-				else if (buff_addr[7:0] == 8'h1A) sector_r <= buff_data_in;
-				else if (buff_addr[7:0] == 8'h1B) begin
+				buff_addr[7:0] <= 8'h18 + (last_sector << 3); //choose the next sector
+				last_sector <= last_sector == (buff_data_in - 1'd1) ? 8'h00: last_sector + 1'd1;
+				state <= COMMAND_READ_ID_EXEC2;
+			end
+
+			COMMAND_READ_ID_EXEC2:
+			if (~sd_busy) begin
+				if (buff_addr[2:0] == 8'h00) sector_c <= buff_data_in;
+				else if (buff_addr[2:0] == 8'h01) sector_h <= buff_data_in;
+				else if (buff_addr[2:0] == 8'h02) sector_r <= buff_data_in;
+				else if (buff_addr[2:0] == 8'h03) begin
 					sector_n <= buff_data_in;
 					status[0] <= 0;
 					status[1] <= 0;
@@ -483,6 +485,18 @@ always @(posedge clk_sys) begin
 					state <= COMMAND_READ_RESULTS;
 				end
 				buff_addr <= buff_addr + 1'd1;
+			end
+
+			COMMAND_READ_TRACK:
+			begin
+				int_state <= 0;
+				m_status[UPD765_MAIN_CB] <= 1;
+				if (~old_wr & wr & a0) begin
+				   hds <= din[2];
+					command <= COMMAND_RW_DATA_EXEC0;
+					state <= COMMAND_SETUP;
+					{rtrack, write, rw_deleted} <= 3'b100;
+				end
 			end
 
 			COMMAND_WRITE_DATA:
@@ -493,7 +507,7 @@ always @(posedge clk_sys) begin
 				   hds <= din[2];
 					command <= COMMAND_RW_DATA_EXEC0;
 					state <= COMMAND_SETUP;
-					{write, rw_deleted} <= 2'b10;
+					{rtrack, write, rw_deleted} <= 3'b010;
 				end
 			end
 
@@ -505,7 +519,7 @@ always @(posedge clk_sys) begin
 				   hds <= din[2];
 					command<=COMMAND_RW_DATA_EXEC0;
 					state<=COMMAND_SETUP;
-					{write, rw_deleted} <= 2'b11;
+					{rtrack, write, rw_deleted} <= 3'b011;
 				end
 			end
 
@@ -517,7 +531,7 @@ always @(posedge clk_sys) begin
 				   hds <= din[2];
 					command <= COMMAND_RW_DATA_EXEC0;
 					state <= COMMAND_SETUP;
-					{write, rw_deleted} <= 2'b00;
+					{rtrack, write, rw_deleted} <= 3'b000;
 				end
 			end
 
@@ -527,9 +541,9 @@ always @(posedge clk_sys) begin
 				m_status[UPD765_MAIN_CB] <= 1;
 				if (~old_wr & wr & a0) begin
 				   hds <= din[2];
-					command<=COMMAND_RW_DATA_EXEC0;
-					state<=COMMAND_SETUP;
-					{write, rw_deleted} <= 2'b01;
+					command <= COMMAND_RW_DATA_EXEC0;
+					state <= COMMAND_SETUP;
+					{rtrack, write, rw_deleted} <= 3'b001;
 				end
 			end
 
@@ -538,6 +552,7 @@ always @(posedge clk_sys) begin
 				m_status[UPD765_MAIN_RQM] <= 0;
 				m_status[UPD765_MAIN_EXM] <= 1;
 				m_status[UPD765_MAIN_DIO] <= ~write;
+				if (rtrack) r <= 1;
 				// Read from the track stored at the last seek
 				// even if different one is given in the command
 				image_track_offsets_addr <= (pcn << image_sides) + hds;
@@ -546,9 +561,9 @@ always @(posedge clk_sys) begin
 				state <= COMMAND_READ_RESULTS;
 			end
 
+			//read TrackInfo into RAM
 			COMMAND_RW_DATA_EXEC1:
 			if (~sd_busy) begin
-				//read TrackInfo into RAM
 				sd_buff_type <= UPD765_SD_BUFF_TRACKINFO;
 				sd_rd <= 1;
 				sd_lba <= image_track_offsets_in[15:1];
@@ -558,13 +573,14 @@ always @(posedge clk_sys) begin
 
 			COMMAND_RW_DATA_EXEC2:
 			if (~sd_busy) begin
-				current_sector <= 1;
+				current_sector <= 1'd1;
 				sd_buff_type <= UPD765_SD_BUFF_TRACKINFO;
 				seek_pos <= {image_track_offsets_in+1'd1,8'd0}; //TrackInfo+256bytes
 				buff_addr <= {image_track_offsets_in[0], 8'h14}; //sector size
 				state <= COMMAND_RW_DATA_EXEC3;
 			end
 
+			//process trackInfo + sectorInfo
 			COMMAND_RW_DATA_EXEC3:
 			if (~sd_busy) begin
 				if (buff_addr[7:0] == 8'h14) begin
@@ -574,11 +590,11 @@ always @(posedge clk_sys) begin
 					total_sectors <= buff_data_in;
 					buff_addr[7:0] <= 8'h18; //sector info list
 				end else if (current_sector > total_sectors) begin
-					//sector not found
+					//sector not found or end of track
 					m_status[UPD765_MAIN_EXM] <= 0;
 					state <= COMMAND_READ_RESULTS;
-					status[0] <= 8'h40;
-					status[1] <= 4;
+					status[0] <= rtrack ? 8'h00 : 8'h40;
+					status[1] <= rtrack ? 8'h00 : 8'h04;
 					status[2] <= 0;
 				end else begin
 					//process sector info list
@@ -592,23 +608,25 @@ always @(posedge clk_sys) begin
 						6: if (image_edsk) sector_size[7:0] <= buff_data_in;
 						7: begin
 								if (image_edsk) sector_size[15:8] <= buff_data_in;
-									state <= COMMAND_RW_DATA_EXEC4;
-								end
+								state <= COMMAND_RW_DATA_EXEC4;
+							end
 					endcase
 						buff_addr <= buff_addr + 1'd1;
 					end
 			end
 
+			//found the sector?
 			COMMAND_RW_DATA_EXEC4:
-			if (sector_c != c) begin
+			if (sector_c != c && ~rtrack) begin
 				m_status[UPD765_MAIN_EXM] <= 0;
 				state <= COMMAND_READ_RESULTS;
 				status[0] <= 8'h40;
-				status[1] <= 4;
-				status[2] <= 2; //bad cylinder
-			end else if (sector_r == r && sector_h == h && sector_n == n) begin
+				status[1] <= 8'h04; //no data
+				status[2] <= sector_c == 8'hff ? 8'h02 : 8'h10; //bad/wrong cylinder
+			end else if ((rtrack && current_sector == r) || 
+							(~rtrack && sector_r == r && sector_h == h && sector_n == n)) begin
 				//sector found in the sector info list
-				if (sector_n == 6) bytes_to_read <= 6144;
+				if (sector_n == 6) bytes_to_read <= sector_size[14:0]; //speccial handling of 8k sectors
 				else if (!sector_n) bytes_to_read = dtl;
 				else bytes_to_read <= 8'h80 << sector_n[2:0];
 				timeout <= COMMAND_TIMEOUT;
@@ -620,9 +638,9 @@ always @(posedge clk_sys) begin
 				state <= COMMAND_RW_DATA_EXEC3;
 			end
 
+			//Read the LBA for the sector into the RAM
 			COMMAND_RW_DATA_EXEC5:
 			if (~sd_busy) begin
-				//Read the sector to the RAM
 				sd_buff_type <= UPD765_SD_BUFF_SECTOR;
 				sd_rd <= 1;
 				sd_lba <= seek_pos[31:9];
@@ -631,6 +649,7 @@ always @(posedge clk_sys) begin
 				state <= COMMAND_RW_DATA_EXEC6;
 			end
 
+			//Read from/write to Speccy
 			COMMAND_RW_DATA_EXEC6:
 			if (~sd_busy) begin
 				if (!bytes_to_read) begin
@@ -641,7 +660,7 @@ always @(posedge clk_sys) begin
 						sd_wr <= 1;
 						sd_busy <= 1;
 					end
-					state <= COMMAND_RW_DATA_EXEC7;
+					state <= COMMAND_RW_DATA_EXEC8;
 				end else if (!timeout) begin
 					m_status[UPD765_MAIN_EXM] <= 0;
 					state <= COMMAND_READ_RESULTS;
@@ -655,7 +674,8 @@ always @(posedge clk_sys) begin
 						state <= COMMAND_RW_DATA_EXEC5;
 					end
 					//Speedlock: randomize 'weak' sectors last bytes
-					dout <= (sector_st1[5] & sector_st2[5] & !bytes_to_read[14:2]) ?
+					dout <= (current_sector == 2 & !pcn & ~hds &
+					         sector_st1[5] & sector_st2[5] & !bytes_to_read[14:2]) ?
 								timeout[7:0] :
 								buff_data_in;
 					buff_addr <= buff_addr + 1'd1;
@@ -667,7 +687,7 @@ always @(posedge clk_sys) begin
 					buff_data_out <= din;
 					timeout <= COMMAND_TIMEOUT;
 					m_status[UPD765_MAIN_RQM] <= 0;
-					state <= COMMAND_RW_DATA_EXEC8;
+					state <= COMMAND_RW_DATA_EXEC7;
 				end else begin
 					m_status[UPD765_MAIN_RQM] <= 1;
 					timeout <= timeout - 1'd1;
@@ -677,27 +697,6 @@ always @(posedge clk_sys) begin
 			end
 
 			COMMAND_RW_DATA_EXEC7:
-			if	((sector_st1[5] & sector_st2[5]) | (rw_deleted ^ sector_st2[6])) begin
-		      //deleted mark or crc error
-				m_status[UPD765_MAIN_EXM] <= 0;
-				state <= COMMAND_READ_RESULTS;
-				status[0] <= 8'h40;
-				status[1] <= sector_st1;
-				status[2] <= rw_deleted ? 8'h40 : sector_st2;
-			end else	if (sector_r == eot) begin
-				//end of cylinder
-				m_status[UPD765_MAIN_EXM] <= 0;
-				state <= COMMAND_READ_RESULTS;
-				status[0] <= 8'h40;
-				status[1] <= 8'h80;
-				status[2] <= 0;
-			end else begin
-				//read the next sector (multi-sector transfer)
-				r <= r + 1'd1;
-				state <= COMMAND_RW_DATA_EXEC2;
-			end
-
-			COMMAND_RW_DATA_EXEC8:
 			begin
 				buff_wr <= 0;
 				buff_addr <= buff_addr + 1'd1;
@@ -718,18 +717,26 @@ always @(posedge clk_sys) begin
 				end
 			end
 
-			COMMAND_READ_TRACK:
-			begin
-				int_state <= 0;
-				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-					command <= COMMAND_READ_TRACK_EXEC;
-					state <= COMMAND_SETUP;
-				end
-			end
-			COMMAND_READ_TRACK_EXEC:
-			begin
+			//End of reading/writing sector, what's next?
+			COMMAND_RW_DATA_EXEC8:
+			if	(~rtrack & ((sector_st1[5] & sector_st2[5]) | (rw_deleted ^ sector_st2[6]))) begin
+		      //deleted mark or crc error
+				m_status[UPD765_MAIN_EXM] <= 0;
 				state <= COMMAND_READ_RESULTS;
+				status[0] <= 8'h40;
+				status[1] <= sector_st1;
+				status[2] <= rw_deleted ? 8'h40 : sector_st2;
+			end else	if ((rtrack ? current_sector : sector_r) == eot) begin
+				//end of cylinder
+				m_status[UPD765_MAIN_EXM] <= 0;
+				state <= COMMAND_READ_RESULTS;
+				status[0] <= rtrack ? 8'h00 : 8'h40;
+				status[1] <= 8'h80;
+				status[2] <= 0;
+			end else begin
+				//read the next sector (multi-sector transfer)
+				r <= r + 1'd1;
+				state <= COMMAND_RW_DATA_EXEC2;
 			end
 
 			COMMAND_FORMAT_TRACK:
