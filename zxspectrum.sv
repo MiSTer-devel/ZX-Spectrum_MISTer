@@ -695,10 +695,10 @@ always @(posedge clk_sys) begin
 		fdd_ro    <= img_readonly;
 
 	   //Only TRDs on +3
-		fdd_ready <= (!ioctl_index[7:6] & plus3) | ~plus3;
-		plusd_en  <= |ioctl_index[7:6] & ~plus3;
+		fdd_ready <= ((!ioctl_index[7:6] & plus3) | ~plus3) && (img_size != 0);
+		plusd_en  <= (|ioctl_index[7:6] & ~plus3) && (img_size != 0);
 		//DSK only for +3
-		plus3_fdd_ready <= plus3 & (ioctl_index[7:6] == 2); 
+		plus3_fdd_ready <= (plus3 & (ioctl_index[7:6] == 2)) && (img_size != 0);
 	end
 
 	old_rd <= io_rd;
