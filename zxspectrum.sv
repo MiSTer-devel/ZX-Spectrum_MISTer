@@ -112,7 +112,7 @@ localparam CONF_STR1 = {
 	"-;",
 	"S,TRDIMGDSKMGT,Load Disk;",
 	"-;",
-	"F,TAPCSW,Load Tape;",
+	"F,TAPCSWTZX,Load Tape;",
 	"O6,Fast tape load,On,Off;",
 	"-;",
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
@@ -126,7 +126,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"2,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.70.",`BUILD_DATE
+	"V,v3.75.",`BUILD_DATE
 };
 
 
