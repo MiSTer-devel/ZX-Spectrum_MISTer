@@ -8,13 +8,13 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Turbo 7MHz, 14MHz, 28MHz, 56MHz.
 - ULA+ v1.1 programmable palettes with extended Timex control.
 - Timex HiColor, HiRes modes.
-- Original Tape loading through OSD (CSW files).
+- TAP tape format with turbo (direct byte injection) and normal loading.
+- TZX and CSW tape formats with fast(at 56MHz) and normal loading.
 - TR-DOS (Beta Disk Interface) and native TRD images.
-- G+DOS (MGT +D Disk Interface) and IMG, MGT images (only in none +2A/3 memory modes).
+- G+DOS (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
 - +3 Disk drive usable with +3DOS.
 - Multiface 128 and Multiface 3 (in +3 mode) add-on.
 - Memory snapshot save/load in +D and Multiface.
-- Native TAP with turbo loading. Fast loading for TAP and CSW.
 - Kempston Mouse.
 - Kempston Joystick (as joystick 1).
 - Sinclair Joystick I (as joystick 2).
@@ -44,7 +44,7 @@ In normal mode, while TAP loading, the following keys can be used:
 - F2 - jump to previous part (if pressed while pilot tone), or beginning of current part (if pressed while code is transferring).
 - F3 - skip to next part
 
-**CSW** is tape format, useful only for apps using non-standard loaders with non-standard transfer speeds. These files are are always loaded in normal mode. You can use **F1** key to pause/continue.
+If game uses non-standard loader, then loading usually paused after loading of first part. Press **F1** to continue loading.
 
 OSD option **Fast tape load** increases CPU frequency to 56MHz while tape loading.
 
