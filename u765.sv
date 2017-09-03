@@ -442,15 +442,27 @@ always @(posedge clk_sys) begin
 				int_state<=0;
 				m_status[UPD765_MAIN_CB] <= 1;
 				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					image_track_offsets_addr <= (pcn << image_sides) + din[2];
-					state <= COMMAND_READ_ID_EXEC0;
-					m_status[UPD765_MAIN_RQM] <= 0;
+					if (~ready | ~image_ready) begin
+						status[0] <= 8'h40;
+						status[1] <= 8'b101;
+						status[2] <= 0;
+						state <= COMMAND_READ_RESULTS;
+					end else	if (din[2] & ~image_sides) begin
+						status[0] <= 8'h48; //no side B
+						status[1] <= 0;
+						status[2] <= 0;
+						state <= COMMAND_READ_RESULTS;
+					end else begin
+						hds <= din[2];
+						image_track_offsets_addr <= (pcn << image_sides) + din[2];
+						state <= COMMAND_READ_ID_EXEC0;
+						m_status[UPD765_MAIN_RQM] <= 0;
+					end
 				end
 			end
 
          COMMAND_READ_ID_EXEC0:
-			if (ready && image_ready && image_track_offsets_in) begin
+			if (image_track_offsets_in) begin
 				//load the TrackInfo
 				sd_buff_type <= UPD765_SD_BUFF_TRACKINFO;
 				sd_rd <= 1;
@@ -491,64 +503,49 @@ always @(posedge clk_sys) begin
 			begin
 				int_state <= 0;
 				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					command <= COMMAND_RW_DATA_EXEC0;
-					state <= COMMAND_SETUP;
-					{rtrack, write, rw_deleted} <= 3'b100;
-				end
+				command <= COMMAND_RW_DATA_EXEC0;
+				state <= COMMAND_SETUP;
+				{rtrack, write, rw_deleted} <= 3'b100;
 			end
 
 			COMMAND_WRITE_DATA:
 			begin
 				int_state <= 0;
 				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					command <= COMMAND_RW_DATA_EXEC0;
-					state <= COMMAND_SETUP;
-					{rtrack, write, rw_deleted} <= 3'b010;
-				end
+				command <= COMMAND_RW_DATA_EXEC0;
+				state <= COMMAND_SETUP;
+				{rtrack, write, rw_deleted} <= 3'b010;
 			end
 
 			COMMAND_WRITE_DELETED_DATA:
 			begin
 				int_state<=0;
 				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					command<=COMMAND_RW_DATA_EXEC0;
-					state<=COMMAND_SETUP;
-					{rtrack, write, rw_deleted} <= 3'b011;
-				end
+				command <= COMMAND_RW_DATA_EXEC0;
+				state <= COMMAND_SETUP;
+				{rtrack, write, rw_deleted} <= 3'b011;
 			end
 
 			COMMAND_READ_DATA:
 			begin
 				int_state <= 0;
 				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					command <= COMMAND_RW_DATA_EXEC0;
-					state <= COMMAND_SETUP;
-					{rtrack, write, rw_deleted} <= 3'b000;
-				end
+				command <= COMMAND_RW_DATA_EXEC0;
+				state <= COMMAND_SETUP;
+				{rtrack, write, rw_deleted} <= 3'b000;
 			end
 
 			COMMAND_READ_DELETED_DATA:
 			begin
 				int_state<=0;
 				m_status[UPD765_MAIN_CB] <= 1;
-				if (~old_wr & wr & a0) begin
-				   hds <= din[2];
-					command <= COMMAND_RW_DATA_EXEC0;
-					state <= COMMAND_SETUP;
-					{rtrack, write, rw_deleted} <= 3'b001;
-				end
+				command <= COMMAND_RW_DATA_EXEC0;
+				state <= COMMAND_SETUP;
+				{rtrack, write, rw_deleted} <= 3'b001;
 			end
 
 			COMMAND_RW_DATA_EXEC0:
-			if (ready & image_ready) begin
+			begin
 				m_status[UPD765_MAIN_RQM] <= 0;
 				m_status[UPD765_MAIN_EXM] <= 1;
 				m_status[UPD765_MAIN_DIO] <= ~write;
@@ -557,8 +554,6 @@ always @(posedge clk_sys) begin
 				// even if different one is given in the command
 				image_track_offsets_addr <= (pcn << image_sides) + hds;
 				state <= COMMAND_RW_DATA_EXEC1;
-			end else begin
-				state <= COMMAND_READ_RESULTS;
 			end
 
 			//read TrackInfo into RAM
@@ -823,35 +818,51 @@ always @(posedge clk_sys) begin
 			if (!old_wr & wr & a0) begin
 				case (substate)
 					0: begin
-							c <= din;
+							hds <= din[2];
 							substate <= 1;
 						end
-					1:	begin
-							h <= din;
+					1: begin
+							c <= din;
 							substate <= 2;
 						end
-					2: begin
-							r <= din;
+					2:	begin
+							h <= din;
 							substate <= 3;
 						end
 					3: begin
-							n <= din;
+							r <= din;
 							substate <= 4;
 						end
 					4: begin
-							eot <= din;
+							n <= din;
 							substate <= 5;
 						end
-					5:	begin
-							gpl <= din;
+					5: begin
+							eot <= din;
 							substate <= 6;
 						end
-					6: begin
-							dtl <= din;
-							state <= command;
-							substate <= 0;
+					6:	begin
+							gpl <= din;
+							substate <= 7;
 						end
-					7: ;//not happen
+					7: begin
+							dtl <= din;
+							substate <= 0;
+							if (~ready | ~image_ready) begin
+								status[0] <= 8'h40;
+								status[1] <= 8'b101;
+								status[2] <= 0;
+								state <= COMMAND_READ_RESULTS;
+							end else if (hds & ~image_sides) begin
+								hds <= 0;
+								status[0] <= 8'h48; //no side B
+								status[1] <= 0;
+								status[2] <= 0;
+								state <= COMMAND_READ_RESULTS;
+							end else begin
+								state <= command;
+							end
+						end
 				endcase
 			end
 
@@ -862,7 +873,7 @@ always @(posedge clk_sys) begin
 				if (~old_rd & rd & a0) begin
 					case (substate)
 						0: begin
-								dout <= status[0];
+								dout <= {status[0][7:3], hds, status[0][1:0]};
 								substate <= 1;
 							end
 						1: begin
