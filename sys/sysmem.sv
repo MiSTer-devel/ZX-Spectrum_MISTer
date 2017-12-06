@@ -23,11 +23,14 @@ module sysmem_lite
 	input    [7:0] ram2_byteenable,       //          .byteenable
 	input          ram2_write,            //          .write
 
+	output         ctl_clock,
 	input          reset_cold_req,        //     reset.cold_req
 	output         reset_reset,           //          .reset
 	input          reset_reset_req,       //          .reset_req
 	input          reset_warm_req         //          .warm_req
 );
+
+assign ctl_clock = clk_vip_clk;
 
 wire hps_h2f_reset_reset;           // HPS:h2f_rst_n -> Reset_Source:reset_hps
 wire reset_source_reset_cold_reset; // Reset_Source:reset_cold -> HPS:f2h_cold_rst_req_n

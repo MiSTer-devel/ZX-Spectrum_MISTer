@@ -1,7 +1,7 @@
 //============================================================================
-// Sinclair ZX Spectrum host board
+//  Sinclair ZX Spectrum
 // 
-//  Port to DE10-nano board. 
+//  Port to MiSTer.
 //  Copyright (C) 2017 Sorgelig
 //
 //  Based on sample ZX Spectrum code by Goran Devic
@@ -31,7 +31,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [37:0] HPS_BUS,
+	inout  [43:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -53,7 +53,7 @@ module emu
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
-	// b[1]: 0 - LED status is system status ORed with b[0]
+	// b[1]: 0 - LED status is system status OR'd with b[0]
 	//       1 - LED status is controled solely by b[0]
 	// hint: supply 2'b00 to let the system control the LED.
 	output  [1:0] LED_POWER,
@@ -63,6 +63,12 @@ module emu
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
 	input         TAPE_IN,
+
+	// SD-SPI
+	output        SD_SCK,
+	output        SD_MOSI,
+	input         SD_MISO,
+	output        SD_CS,
 
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
@@ -92,6 +98,7 @@ module emu
 );
 
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
+assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign AUDIO_S   = 0;
 
@@ -126,7 +133,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"2,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.75.",`BUILD_DATE
+	"V,v3.76.",`BUILD_DATE
 };
 
 
@@ -267,9 +274,22 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.ps2_kbd_led_use(0),
 	.ps2_kbd_led_status(0),
 
+	.ps2_kbd_clk_out(ps2_kbd_clk),
+	.ps2_kbd_data_out(ps2_kbd_data),
+	.ps2_mouse_clk_out(ps2_mouse_clk),
+	.ps2_mouse_data_out(ps2_mouse_data),
+
 	// unused
 	.joystick_analog_0(),
-	.joystick_analog_1()
+	.joystick_analog_1(),
+	.RTC(),
+	.TIMESTAMP(),
+	.ps2_kbd_clk_in(1),
+	.ps2_kbd_data_in(1),
+	.ps2_mouse_clk_in(1),
+	.ps2_mouse_data_in(1),
+	.ps2_key(),
+	.ps2_mouse()
 );
 
 reg  [2:0] cur_mode = 0;

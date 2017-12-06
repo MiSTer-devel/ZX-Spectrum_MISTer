@@ -28,9 +28,7 @@ module sync_vg
 	output reg [Y_BITS:0] v_count_out,
 	output reg [X_BITS-1:0] h_count_out,
 	output reg [X_BITS-1:0] x_out,
-	output reg [Y_BITS:0] y_out,
-	output reg field_out,
-	output wire clk_out
+	output reg [Y_BITS:0] y_out
 );
 
 reg [X_BITS-1:0] h_count;
@@ -41,8 +39,6 @@ reg [Y_BITS-1:0] v_fp;
 reg [Y_BITS-1:0] v_bp;
 reg [Y_BITS-1:0] v_sync;
 reg [X_BITS-1:0] hv_offset;
-
-assign clk_out = !clk;
 
 /* horizontal counter */
 always @(posedge clk)
@@ -91,7 +87,7 @@ always @(posedge clk)
 
 always @(posedge clk)
 	if (reset)
-		{ vs_out, hs_out, hde_out, vde_out, field_out } <= 4'b0;
+		{ vs_out, hs_out, hde_out, vde_out } <= 0;
 	else begin
 		hs_out <= ((h_count < h_sync));
 
@@ -116,8 +112,6 @@ always @(posedge clk)
 			y_out <= { (v_count - (v_sync + v_bp)) , field };
 		else
 			y_out <= { 1'b0, (v_count - (v_sync + v_bp)) };
-			field_out <= field;
-
 	end
 
 endmodule
