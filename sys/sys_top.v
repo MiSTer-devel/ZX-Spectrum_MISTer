@@ -384,6 +384,8 @@ wire vde, hde;
 wire vs_hdmi;
 wire hs_hdmi;
 
+/*
+
 pattern_vg
 #(
 	.B(8), // Bits per channel
@@ -414,6 +416,7 @@ pattern_vg
 	.pattern(4),
 	.ramp_step(20'h0333)
 );
+*/
 
 wire reset;
 sysmem_lite sysmem
@@ -451,7 +454,65 @@ sysmem_lite sysmem
 	.ram2_read(0),
 	.ram2_writedata(0),
 	.ram2_byteenable(0),
-	.ram2_write(0)
+	.ram2_write(0),
+
+	// HDMI frame buffer
+	.vbuf_clk(clk_ctl),
+	.vbuf_address(vbuf_address),
+	.vbuf_burstcount(vbuf_burstcount),
+	.vbuf_waitrequest(vbuf_waitrequest),
+	.vbuf_writedata(vbuf_writedata),
+	.vbuf_byteenable(vbuf_byteenable),
+	.vbuf_write(vbuf_write),
+	.vbuf_readdata(vbuf_readdata),
+	.vbuf_readdatavalid(vbuf_readdatavalid),
+	.vbuf_read(vbuf_read)
+);
+
+wire  [27:0] vbuf_address;
+wire   [7:0] vbuf_burstcount;
+wire         vbuf_waitrequest;
+wire [127:0] vbuf_readdata;
+wire         vbuf_readdatavalid;
+wire         vbuf_read;
+wire [127:0] vbuf_writedata;
+wire  [15:0] vbuf_byteenable;
+wire         vbuf_write;
+
+assign HDMI_TX_VS = vs_hdmi;
+assign HDMI_TX_HS = hs_hdmi;
+
+hdmi_lite hdmi_lite
+(
+	.reset(reset),
+
+	.clk_video(clk_vid),
+	.ce_pixel(ce_pix),
+	.video_vs(vs),
+	.video_de(de),
+	.video_d({r_out,g_out,b_out}),
+
+	.clk_hdmi(HDMI_TX_CLK),
+	.hdmi_hde(hde),
+	.hdmi_vde(vde),
+	.hdmi_d(hdmi_data),
+	.hdmi_de(HDMI_TX_DE),
+
+	.quadbuf(1),
+	.scale_x(0),
+	.scale_y(0),
+	.scale_auto(1),
+
+	.clk_vbuf(clk_ctl),
+	.vbuf_address(vbuf_address),
+	.vbuf_burstcount(vbuf_burstcount),
+	.vbuf_waitrequest(vbuf_waitrequest),
+	.vbuf_writedata(vbuf_writedata),
+	.vbuf_byteenable(vbuf_byteenable),
+	.vbuf_write(vbuf_write),
+	.vbuf_readdata(vbuf_readdata),
+	.vbuf_readdatavalid(vbuf_readdatavalid),
+	.vbuf_read(vbuf_read)
 );
 
 `endif
