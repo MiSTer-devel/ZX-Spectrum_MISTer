@@ -21,7 +21,7 @@
    {
       datum _sortIndex
       {
-         value = "5";
+         value = "3";
          type = "int";
       }
    }
@@ -37,7 +37,7 @@
    {
       datum _sortIndex
       {
-         value = "4";
+         value = "5";
          type = "int";
       }
    }
@@ -53,7 +53,7 @@
    {
       datum _sortIndex
       {
-         value = "3";
+         value = "4";
          type = "int";
       }
    }
@@ -981,12 +981,12 @@
    kind="avalon_streaming"
    version="17.0"
    start="Frame_Buffer.dout"
-   end="Video_Output.din" />
+   end="Scaler.din" />
  <connection
    kind="avalon_streaming"
    version="17.0"
    start="Mixer.dout"
-   end="Frame_Buffer.din" />
+   end="Video_Output.din" />
  <connection
    kind="avalon_streaming"
    version="17.0"
@@ -996,7 +996,7 @@
    kind="avalon_streaming"
    version="17.0"
    start="Video_Input.dout_0"
-   end="Scaler.din" />
+   end="Frame_Buffer.din" />
  <connection
    kind="clock"
    version="17.0"
