@@ -226,10 +226,8 @@ end
 
 
 //////////////////   HPS I/O   ///////////////////
-wire        ps2_kbd_clk;
-wire        ps2_kbd_data;
-wire        ps2_mouse_clk;
-wire        ps2_mouse_data;
+wire [65:0] ps2_key;
+wire [24:0] ps2_mouse;
 
 wire [15:0] joystick_0;
 wire [15:0] joystick_1;
@@ -264,6 +262,7 @@ wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
+
 hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 (
 	.*,
@@ -271,25 +270,25 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.sd_conf(0),
 	.ioctl_wait(0),
 	.sd_ack_conf(),
+
+	.ps2_key(ps2_key),
 	.ps2_kbd_led_use(0),
 	.ps2_kbd_led_status(0),
-
-	.ps2_kbd_clk_out(ps2_kbd_clk),
-	.ps2_kbd_data_out(ps2_kbd_data),
-	.ps2_mouse_clk_out(ps2_mouse_clk),
-	.ps2_mouse_data_out(ps2_mouse_data),
+	.ps2_mouse(ps2_mouse),
 
 	// unused
 	.joystick_analog_0(),
 	.joystick_analog_1(),
 	.RTC(),
 	.TIMESTAMP(),
+	.ps2_kbd_clk_out(),
+	.ps2_kbd_data_out(),
+	.ps2_mouse_clk_out(),
+	.ps2_mouse_data_out(),
 	.ps2_kbd_clk_in(1),
 	.ps2_kbd_data_in(1),
 	.ps2_mouse_clk_in(1),
-	.ps2_mouse_data_in(1),
-	.ps2_key(),
-	.ps2_mouse()
+	.ps2_mouse_data_in(1)
 );
 
 reg  [2:0] cur_mode = 0;
@@ -632,8 +631,11 @@ wire  [7:0] mouse_data;
 mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(), .dout(mouse_data));
 
 always @(posedge clk_sys) begin
+	reg old_status = 0;
+	old_status <= ps2_mouse[24];
+
 	if(joystick_0[5:0]) mouse_sel <= 0;
-	if(~ps2_mouse_clk) mouse_sel <= 1;
+	if(old_status != ps2_mouse[24]) mouse_sel <= 1;
 end
 
 

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  PS2-to-Kempston Mouse
-//  (C) 2016 Sorgelig
+//  (C) 2017 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -22,11 +22,9 @@
 module mouse
 (
 	input        clk_sys,
-	input        ce_7mp,
 	input        reset,
 
-	input        ps2_mouse_clk,
-	input        ps2_mouse_data,
+	input [24:0] ps2_mouse,
 	
 	input  [2:0] addr,
 	output       sel,
@@ -36,13 +34,12 @@ module mouse
 assign dout = data;
 assign sel  = port_sel;
 
-reg   [1:0] button;
+reg   [2:0] button;
 reg  [11:0] dx;
 reg  [11:0] dy;
-reg  [32:0] q;
 
-wire [11:0] newdx = dx + {{4{q[5]}},q[19:12]};
-wire [11:0] newdy = dy + {{4{q[6]}},q[30:23]};
+wire [11:0] newdx = dx + {{4{ps2_mouse[4]}},ps2_mouse[15:8]};
+wire [11:0] newdy = dy + {{4{ps2_mouse[5]}},ps2_mouse[23:16]};
 
 reg   [1:0] swap;
 reg   [7:0] data;
@@ -52,37 +49,27 @@ always @* begin
 	casex(addr)
 		 3'b011: data = dx[7:0];
 		 3'b111: data = dy[7:0];
-		 3'bX10: data = ~{6'b000000, button[~swap[1]], button[swap[1]]} ;
+		 3'bX10: data = ~{5'b00000,button[2], button[swap[1]], button[~swap[1]]} ;
 		default: {port_sel,data} = 8'hFF;
 	endcase
 end
 
 always @(posedge clk_sys) begin
-	integer   idle;
-	reg       old_clk;
+	reg       old_status;
+	
+	old_status <= ps2_mouse[24];
 
 	if(reset) begin
 		dx     <= 128; // dx != dy for better mouse detection
 		dy     <= 0;
 		button <= 0;
-		idle   <= 0;
 		swap   <= 0;
 	end else begin
-		old_clk <= ps2_mouse_clk;
-		if(old_clk & ~ps2_mouse_clk) begin
-			q <= {ps2_mouse_data, q[32:1]};
-			idle <= 0;
-		end else if(~old_clk & ps2_mouse_clk) begin
-			if(q[32] & ^q[31:23] & ~q[22] & q[21] & ^q[20:12] & ~q[11] & q[10] & ^q[9:1] & ~q[0]) begin
-				if(!swap) swap <= q[2:1];
-				button <= q[2:1];
-				dx <= |newdx[11:8] ? {8{~q[5]}} : newdx;
-				dy <= |newdy[11:8] ? {8{~q[6]}} : newdy;
-				q  <= ~0;
-			end
-		end else if(ps2_mouse_clk & ce_7mp) begin
-			if(idle < 3500000) idle <= idle + 1;
-				else q <= ~0;
+		if(old_status != ps2_mouse[24]) begin
+			if(!swap) swap <= ps2_mouse[1:0];
+			button <= ps2_mouse[2:0];
+			dx <= |newdx[11:8] ? {8{~ps2_mouse[4]}} : newdx;
+			dy <= |newdy[11:8] ? {8{~ps2_mouse[5]}} : newdy;
 		end
 	end
 end
