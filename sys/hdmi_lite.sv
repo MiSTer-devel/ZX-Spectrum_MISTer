@@ -27,6 +27,8 @@ module hdmi_lite
 	output reg     hdmi_de,
 	output  [23:0] hdmi_d,
 
+	input   [11:0] screen_w,
+	input   [11:0] screen_h,
 	input          quadbuf,
 
 	// 0-3 => scale 1-4
@@ -47,8 +49,6 @@ module hdmi_lite
 );
 
 localparam  [7:0] burstsz  = 64;
-localparam [11:0] screen_w = 1280;
-localparam [11:0] screen_h = 720;
 
 reg   [1:0] nbuf = 0;
 wire [27:0] read_buf  = {4'd2, 3'b000, (quadbuf ? nbuf-2'd1 : 2'b00), 19'd0};

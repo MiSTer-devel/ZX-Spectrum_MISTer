@@ -490,7 +490,7 @@ always@(posedge clk_sys) begin
 					UIO_FILE_TX:
 						begin
 							if(io_din[7:0]) begin
-								addr <= ioctl_index[4:0] ? 25'h400000 : 25'h200000;
+								addr <= 0;
 								ioctl_download <= 1; 
 							end else begin
 								ioctl_addr <= addr;

@@ -397,7 +397,7 @@ wire        ram_ready;
 
 always_comb begin
 	casex({dma, tape_req, page_special, addr[15:14]})
-		'b1X_X_XX: ram_addr = ioctl_addr;
+		'b1X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h200000);
 		'b01_X_XX: ram_addr = tape_addr;
 		'b00_0_00: ram_addr = { 4'b1000, page_rom,   addr[13:0]}; //ROM
 		'b00_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
@@ -841,7 +841,7 @@ smart_tape tape
 	.buff_din(ram_dout),
 
 	.ioctl_download(ioctl_download & (ioctl_index[4:0] == 2)),
-	.tape_size(ioctl_addr - 25'h400000 + 1'b1),
+	.tape_size(ioctl_addr),
 	.tape_mode(!ioctl_index[7:6]),
 
 	.m1(~nM1 & ~nMREQ),
