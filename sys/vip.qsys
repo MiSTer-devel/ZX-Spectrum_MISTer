@@ -850,9 +850,9 @@
   <parameter name="V_BANKS" value="1" />
   <parameter name="V_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
   <parameter name="V_FRACTION_BITS" value="7" />
-  <parameter name="V_FUNCTION" value="LANCZOS_3" />
+  <parameter name="V_FUNCTION" value="LANCZOS_2" />
   <parameter name="V_INTEGER_BITS" value="1" />
-  <parameter name="V_PHASES" value="16" />
+  <parameter name="V_PHASES" value="32" />
   <parameter name="V_SIGNED" value="1" />
   <parameter name="V_SYMMETRIC" value="0" />
   <parameter name="V_TAPS" value="4" />
