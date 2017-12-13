@@ -34,7 +34,8 @@ module mouse
 assign dout = data;
 assign sel  = port_sel;
 
-reg   [2:0] button;
+reg   [1:0] button;
+reg         mbutton;
 reg  [11:0] dx;
 reg  [11:0] dy;
 
@@ -49,7 +50,7 @@ always @* begin
 	casex(addr)
 		 3'b011: data = dx[7:0];
 		 3'b111: data = dy[7:0];
-		 3'bX10: data = ~{5'b00000,button[2], button[swap[1]], button[~swap[1]]} ;
+		 3'bX10: data = ~{5'b00000,mbutton, button[swap[1]], button[~swap[1]]} ;
 		default: {port_sel,data} = 8'hFF;
 	endcase
 end
@@ -67,7 +68,7 @@ always @(posedge clk_sys) begin
 	end else begin
 		if(old_status != ps2_mouse[24]) begin
 			if(!swap) swap <= ps2_mouse[1:0];
-			button <= ps2_mouse[2:0];
+			{mbutton,button} <= ps2_mouse[2:0];
 			dx <= |newdx[11:8] ? {8{~ps2_mouse[4]}} : newdx;
 			dy <= |newdy[11:8] ? {8{~ps2_mouse[5]}} : newdy;
 		end
