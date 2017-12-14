@@ -42,7 +42,7 @@ module keyboard
 	input             reset,
 	input             clk_sys,
 
-	input      [65:0] ps2_key,
+	input      [10:0] ps2_key,
 
 	input      [15:0] addr,
 	output      [4:0] key_data,
@@ -264,10 +264,6 @@ reg [8:0] auto[46] = '{
 	255
 };
 
-wire pressed     = (ps2_key[15:8] != 8'hf0);
-wire extended    = (~pressed ? (ps2_key[23:16] == 8'he0) : (ps2_key[15:8] == 8'he0));
-wire [8:0] kcode = ps2_key[63:24] ? 9'd0 : {extended, ps2_key[7:0]}; // filter out PRNSCR and PAUSE
-
 always @(posedge clk_sys) begin
 	integer div;
 	reg [5:0] auto_pos = 0;
@@ -276,18 +272,18 @@ always @(posedge clk_sys) begin
 
 	input_strobe <= 0;
 	old_reset <= reset;
-	old_state <= ps2_key[64];
+	old_state <= ps2_key[10];
 
 	if(~old_reset & reset)begin
 		auto_pos <= 0;
 	end else begin
 		if(auto[auto_pos] == 255) begin
 			div <=0;
-			if(old_state != ps2_key[64]) begin
-				release_btn <= ~pressed;
-				code <= kcode[7:0];
+			if(old_state != ps2_key[10]) begin
+				release_btn <= ~ps2_key[9];
+				code <= ps2_key[7:0];
 				input_strobe <= 1;
-				if((kcode == 9) && ~pressed) auto_pos <= 1; // F10
+				if((ps2_key == 9) && ~ps2_key[9]) auto_pos <= 1; // F10
 			end
 		end else begin
 			div <= div + 1;

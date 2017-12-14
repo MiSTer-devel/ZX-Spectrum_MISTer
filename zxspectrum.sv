@@ -226,7 +226,7 @@ end
 
 
 //////////////////   HPS I/O   ///////////////////
-wire [65:0] ps2_key;
+wire [10:0] ps2_key;
 wire [24:0] ps2_mouse;
 
 wire [15:0] joystick_0;
