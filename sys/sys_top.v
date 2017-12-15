@@ -184,7 +184,7 @@ cyclonev_hps_interface_mpu_general_purpose h2f_gp
 reg [15:0] cfg;
 
 reg        cfg_got   = 0;
-wire [2:0] hdmi_res  = cfg[10:8];
+//wire [2:0] hdmi_res  = cfg[10:8];
 wire       dvi_mode  = cfg[7];
 wire       audio_96k = cfg[6];
 wire       ypbpr_en  = cfg[5];
@@ -224,14 +224,14 @@ always@(posedge clk_sys) begin
 			cnt <= cnt + 1'd1;
 			if(cnt<8) begin
 				case(cnt)
-					0: dwidth  = io_din[11:0];
-					1: dhfp    = io_din[11:0];
-					2: dhs     = io_din[11:0];
-					3: dhbp    = io_din[11:0];
-					4: dheight = io_din[11:0];
-					5: dvfp    = io_din[11:0];
-					6: dvs     = io_din[11:0];
-					7: dvbp    = io_din[11:0];
+					0: WIDTH  = io_din[11:0];
+					1: HFP    = io_din[11:0];
+					2: HS     = io_din[11:0];
+					3: HBP    = io_din[11:0];
+					4: HEIGHT = io_din[11:0];
+					5: VFP    = io_din[11:0];
+					6: VS     = io_din[11:0];
+					7: VBP    = io_din[11:0];
 				endcase
 				if(!cnt) begin
 					cfg_custom_p1 <= 0;
@@ -559,28 +559,14 @@ pll_hdmi pll_hdmi
 );
 
 //1280x720@60 PCLK=74.25MHz CEA
-reg [11:0] dwidth = 1280;
-reg [11:0] dhfp = 110;
-reg [11:0] dhs = 40;
-reg [11:0] dhbp = 220;
-reg [11:0] dheight = 720;
-reg [11:0] dvfp = 5;
-reg [11:0] dvs = 5;
-reg [11:0] dvbp = 20;
-
-reg [11:0] WIDTH,HFP,HBP,HS,HEIGHT,VFP,VBP,VS;
-always @(*) begin
-	case(hdmi_res)
-			1: begin WIDTH = 1024; HFP = 24;  HS = 136; HBP = 160; HEIGHT = 768;  VFP = 3;  VS = 6; VBP = 29; end //65MHz VESA
-			2: begin WIDTH = 720;  HFP = 16;  HS = 62;  HBP = 60;  HEIGHT = 480;  VFP = 9;  VS = 6; VBP = 30; end //27MHz CEA
-			3: begin WIDTH = 720;  HFP = 12;  HS = 64;  HBP = 68;  HEIGHT = 576;  VFP = 5;  VS = 5; VBP = 39; end //27MHz CEA
-			4: begin WIDTH = 1280; HFP = 48;  HS = 112; HBP = 248; HEIGHT = 1024; VFP = 1;  VS = 3; VBP = 38; end //108MHz VESA
-			5: begin WIDTH = 800;  HFP = 40;  HS = 128; HBP = 88;  HEIGHT = 600;  VFP = 1;  VS = 4; VBP = 23; end //40MHz VESA
-			6: begin WIDTH = 640;  HFP = 16;  HS = 96;  HBP = 48;  HEIGHT = 480;  VFP = 10; VS = 2; VBP = 33; end //25.175MHz VESA/CEA
-			7: begin WIDTH = 1280; HFP = 440; HS = 40;  HBP = 220; HEIGHT = 720;  VFP = 5;  VS = 5; VBP = 20; end //74.25MHz CEA
-	default: begin WIDTH = dwidth; HFP = dhfp; HS = dhs; HBP = dhbp; HEIGHT = dheight; VFP = dvfp; VS = dvs; VBP = dvbp; end
-	endcase
-end
+reg  [11:0] WIDTH  = 1280;
+reg  [11:0] HFP    = 110;
+reg  [11:0] HS     = 40;
+reg  [11:0] HBP    = 220;
+reg  [11:0] HEIGHT = 720;
+reg  [11:0] VFP    = 5;
+reg  [11:0] VS     = 5;
+reg  [11:0] VBP    = 20;
 
 wire [63:0] reconfig_to_pll;
 wire [63:0] reconfig_from_pll;
@@ -618,7 +604,7 @@ always @(posedge FPGA_CLK1_50) begin
 	if(~gotd2 & gotd) begin
 		if(~cfg_custom) begin
 			cfg_address <= 31;
-			cfg_data <= {hdmi_res, 6'd0};
+			cfg_data <= 0;
 			cfg_write <= 1;
 		end
 		stage <= stage + 1'd1;
