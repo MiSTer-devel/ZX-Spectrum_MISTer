@@ -283,7 +283,7 @@ always @(posedge clk_sys) begin
 				release_btn <= ~ps2_key[9];
 				code <= ps2_key[7:0];
 				input_strobe <= 1;
-				if((ps2_key == 9) && ~ps2_key[9]) auto_pos <= 1; // F10
+				if((ps2_key[8:0] == 9) && ~ps2_key[9]) auto_pos <= 1; // F10
 			end
 		end else begin
 			div <= div + 1;
