@@ -61,7 +61,8 @@ module emu
 
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
-	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
+	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 	input         TAPE_IN,
 
 	// SD-SPI
@@ -101,6 +102,7 @@ assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DD
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign AUDIO_S   = 0;
+assign AUDIO_MIX = status[3:2];
 
 assign LED_USER  = ioctl_download | tape_led;
 assign LED_DISK  = 0;
@@ -126,6 +128,8 @@ localparam CONF_STR1 = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
+	"O23,Stereo mix,none,25%,50%,100%;",
+	"-;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 512K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
 };
@@ -133,7 +137,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"2,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.76.",`BUILD_DATE
+	"V,v3.77.",`BUILD_DATE
 };
 
 
@@ -312,7 +316,7 @@ wire        nRFSH;
 wire        nBUSACK;
 wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
-wire        reset  = buttons[1] | status[0] | status[2] | cold_reset | warm_reset | shdw_reset | Fn[10];
+wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10];
 
 wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
