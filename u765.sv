@@ -203,7 +203,7 @@ always @(posedge clk_sys) begin
 	reg [7:0] m_status;  //main status register
 	reg [7:0] status[4] = '{0, 0, 0, 0}; //st0-3
 	reg [5:0] state, command;
-	reg [7:0] ncn; //new cylinder number
+	//reg [7:0] ncn; //new cylinder number
 	reg [7:0] pcn; //present cylinder number
    reg ds0;
 	reg hds;
@@ -212,14 +212,14 @@ always @(posedge clk_sys) begin
 	reg [7:0] r;
 	reg [7:0] n;
 	reg [7:0] eot;
-	reg [7:0] gpl;
+	//reg [7:0] gpl;
 	reg [7:0] dtl;
 	reg [7:0] sc;
-	reg [7:0] d;
+	//reg [7:0] d;
 
-	reg mt;
-	reg mfm;
-	reg sk;
+	//reg mt;
+	//reg mfm;
+	//reg sk;
 	reg int_state;
 
 	old_wr <= wr;
@@ -235,7 +235,7 @@ always @(posedge clk_sys) begin
 		image_size <= img_size[19:0];
 		image_scan_state<=1;
 		image_ready<=0;
-		{ds0, ncn, pcn, c, h, r, n} <= 0;
+		{ds0, /*ncn,*/ pcn, c, h, r, n} <= 0;
 		int_state<=0;
 		last_sector <= 0;
 	end
@@ -307,7 +307,7 @@ always @(posedge clk_sys) begin
 		status[3][UPD765_ST3_WP] <= ~image_ready;
 		status[3][UPD765_ST3_RDY] <= image_ready;
 		status[3][UPD765_ST3_T0] <= 1;
-		{ds0, ncn, pcn, c, h, r, n} <= 0;
+		{ds0, /*ncn,*/ pcn, c, h, r, n} <= 0;
 		int_state<=0;
 		{ack, sd_wr, sd_rd, sd_busy} <= 0;
 		image_track_offsets_wr <= 0;
@@ -320,9 +320,9 @@ always @(posedge clk_sys) begin
 				m_status[UPD765_MAIN_RQM] <= 1;
 
 				if (~old_wr & wr & a0) begin
-					mt <= din[7];
-					mfm <= din[6];
-					sk <= din[5];
+					//mt <= din[7];
+					//mfm <= din[6];
+					//sk <= din[5];
 					substate <= 0;
 					casex (din[7:0])
 						8'bXXX00110: state <= COMMAND_READ_DATA;
@@ -400,7 +400,7 @@ always @(posedge clk_sys) begin
 				last_sector <= 0;
 				if (~old_wr & wr & a0) begin
 					state <= COMMAND_IDLE;
-					ncn <= 0;
+					//ncn <= 0;
 					pcn <= 0;
 					status[0] <= 8'h20;
 					status[3][UPD765_ST3_T0] <= 1;
@@ -424,7 +424,7 @@ always @(posedge clk_sys) begin
 			COMMAND_SEEK_EXEC:
 			if (~old_wr & wr & a0) begin
 				if ((ready && image_ready && din<image_tracks) || !din) begin
-					ncn <= din;
+					//ncn <= din;
 					pcn <= din;
 					int_state <= 1;
 					status[0] <= 8'h20;
@@ -622,7 +622,7 @@ always @(posedge clk_sys) begin
 							(~rtrack && sector_r == r && sector_h == h && sector_n == n)) begin
 				//sector found in the sector info list
 				if (sector_n == 6) bytes_to_read <= sector_size[14:0]; //speccial handling of 8k sectors
-				else if (!sector_n) bytes_to_read = dtl;
+				else if (!sector_n) bytes_to_read <= dtl;
 				else bytes_to_read <= 8'h80 << sector_n[2:0];
 				timeout <= COMMAND_TIMEOUT;
 				state <= COMMAND_RW_DATA_EXEC5;
@@ -752,12 +752,12 @@ always @(posedge clk_sys) begin
 			end
 			COMMAND_FORMAT_TRACK3:
 			if (~old_wr & wr & a0) begin
-				gpl <= din;
+				//gpl <= din;
 				state <= COMMAND_FORMAT_TRACK4;
 			end
 			COMMAND_FORMAT_TRACK4:
 			if (~old_wr & wr & a0) begin
-				d <= din;
+				//d <= din;
 				m_status[UPD765_MAIN_EXM] <= 1;
 				state <= COMMAND_FORMAT_TRACK5;
 			end
@@ -842,7 +842,7 @@ always @(posedge clk_sys) begin
 							substate <= 6;
 						end
 					6:	begin
-							gpl <= din;
+							//gpl <= din;
 							substate <= 7;
 						end
 					7: begin
