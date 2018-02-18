@@ -2,7 +2,7 @@
 //  Sinclair ZX Spectrum
 // 
 //  Port to MiSTer.
-//  Copyright (C) 2017 Sorgelig
+//  Copyright (C) 2017,2018 Sorgelig
 //
 //  Based on sample ZX Spectrum code by Goran Devic
 //
@@ -70,6 +70,7 @@ module emu
 	output        SD_MOSI,
 	input         SD_MISO,
 	output        SD_CS,
+	input         SD_CD,
 
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
