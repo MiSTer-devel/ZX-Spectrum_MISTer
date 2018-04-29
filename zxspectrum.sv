@@ -136,7 +136,7 @@ localparam CONF_STR1 = {
 };
 
 localparam CONF_STR2 = {
-	"2,Reset & apply;",
+	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
 	"V,v3.80.",`BUILD_DATE
 };
@@ -271,7 +271,7 @@ wire  [7:0] ioctl_index;
 hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 (
 	.*,
-	.conf_str({CONF_STR1, need_apply ? "T" : "+", CONF_STR2, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
+	.conf_str({CONF_STR1, need_apply ? "R" : "+", CONF_STR2, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
 	.sd_conf(0),
 	.ioctl_wait(0),
 	.sd_ack_conf(),
