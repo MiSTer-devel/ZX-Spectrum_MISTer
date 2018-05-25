@@ -109,8 +109,8 @@ assign LED_USER  = ioctl_download | tape_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3;
+assign VIDEO_ARX = status[5:4] ? 8'd16 : 8'd4;
+assign VIDEO_ARY = status[5:4] ? 8'd9  : 8'd3;
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
@@ -126,7 +126,7 @@ localparam CONF_STR1 = {
 	"O6,Fast tape load,On,Off;",
 	"-;",
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
-	"O1,Aspect ratio,4:3,16:9;",
+	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"O23,Stereo mix,none,25%,50%,100%;",
@@ -138,7 +138,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.80.",`BUILD_DATE
+	"V,v3.82.",`BUILD_DATE
 };
 
 
@@ -626,8 +626,15 @@ always_comb begin
 	endcase
 end
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]));
+video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]), .wide(status[5]));
 
+reg new_vmode = 0;
+always @(posedge clk_sys) begin
+	reg [1:0] vmode;
+	
+	vmode<=status[9:8];
+	if(vmode != status[9:8]) new_vmode <= ~new_vmode;
+end
 
 ////////////////////   HID   ////////////////////
 wire [11:1] Fn;

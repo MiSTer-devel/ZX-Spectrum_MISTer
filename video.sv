@@ -65,6 +65,7 @@ module video
 	input   [2:0] border_color,
 	input   [1:0] scale,
 	input         forced_scandoubler,
+	input         wide,
 
 	// Video outputs
 	output  [7:0] VGA_R,
@@ -125,6 +126,8 @@ always @(posedge clk_sys) begin
 			if(hc == 428) HBlank <= 0;
 		end
 
+		if(wide) HBlank <= !(hc < 312 || hc >= ((mZX && m128) ? 455-33 : 447-33));
+
 		if(sync) begin
 			if(mZX) begin
 				if(vc == 236) VBlank <= 1;
@@ -137,6 +140,7 @@ always @(posedge clk_sys) begin
 				if(vc == 256) VSync  <= 0;
 				if(vc == 272) VBlank <= 0;
 			end
+			if(wide) VBlank <= !(vc < (193) || vc >= (!mZX ? 319-4 : m128 ? 310-4 : 311-4));
 		end
 
 		if( mZX && (vc == 248) && (hc == (m128 ? 6 : 2))) INT <= 1;
