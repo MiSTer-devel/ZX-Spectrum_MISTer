@@ -230,7 +230,7 @@ always @(posedge CLK) begin
 		ymreg[4]  <= 0;
 		ymreg[5]  <= 0;
 		ymreg[6]  <= 0;
-		ymreg[7]  <= 0;
+		ymreg[7]  <= 255;
 		ymreg[8]  <= 0;
 		ymreg[9]  <= 0;
 		ymreg[10] <= 0;
