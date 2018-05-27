@@ -36,7 +36,7 @@ wire [7:0] DO_1;
 reg [5:0]ay0_active;
 reg [5:0]ay1_active;
 wire ay0_playing;
-wire ay1_playing;
+//wire ay1_playing;
 
 // AY0 channel output data
 wire [7:0] psg_ch_a_0;
@@ -121,7 +121,7 @@ assign DO = ay_select ? DO_1 : DO_0;
 
 // AY activity signals
 assign ay0_playing = | ay0_active; // OR reduction (all bits of ay0_active OR'ed with each other)
-assign ay1_playing = | ay1_active; // OR reduction (all bits of ay1_active OR'ed with each other)
+//assign ay1_playing = | ay1_active; // OR reduction (all bits of ay1_active OR'ed with each other)
 
 // Mix channel signals from both AY/YM chips (extending to 9 bits width to prevent clipping)
 assign sum_ch_a = { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };

@@ -516,10 +516,9 @@ always @(posedge clk_sys) begin
 	old_m1 <= m1;
 	
 	old_reset <= reset;
-	if (~old_reset & reset)
-		rmod <= mod;
+	if(~old_reset & reset) rmod <= mod;
 
-	if (reset) begin
+	if(reset) begin
 		page_scr_copy <= 0;
 		page_reg    <= 0;
 		page_reg_plus3 <= 0; 
@@ -528,8 +527,7 @@ always @(posedge clk_sys) begin
 		page_reg[4] <= Fn[10];
 		page_reg_plus3[2] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
-		
-		if (Fn[10] && (rmod == 1)) begin
+		if(Fn[10] && (rmod == 1)) begin
 			p1024  <= 0;
 			pf1024 <= 0;
 			zx48   <= ~plus3;
@@ -568,8 +566,7 @@ always @(posedge clk_sys) begin
 	reg old_we;
 	old_we <= ula_we;
 
-	if(reset)
-		{ear_out, mic_out} <= 2'b00;
+	if(reset) {ear_out, mic_out} <= 2'b00;
 	else if(ula_we & ~old_we) begin
 		border_color <= cpu_dout[2:0];
 		ear_out <= cpu_dout[4]; 
@@ -577,24 +574,12 @@ always @(posedge clk_sys) begin
 	end
 end
 
-//////////////   ADDRESS DECODERS ////////////////
-
-// Mask for port selection (xxxx xxxx 1111 xxxx)
-wire csfx = addr[7] & addr[6] & addr[5] & addr[4];
-
-// Port #BFFD selector (1111 1111 1111 1101)
-wire cs_bffd = addr[15] & ~addr[14] & csfx & addr[3] & addr[2] & ~addr[1] & addr[0];
-
-// Port #FFFD selector (1011 1111 1111 1101)
-wire cs_fffd = addr[15] & addr[14] & csfx & addr[3] & addr[2] & ~addr[1] & addr[0];
-
 
 ////////////////////   AUDIO   ///////////////////
 wire [7:0] sound_data;
 wire [7:0] psg_ch_a;
 wire [7:0] psg_ch_b;
 wire [7:0] psg_ch_c;
-
 wire       psg_enable = addr[0] & addr[15] & ~addr[1];
 wire       psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
 reg        psg_reset;
@@ -618,28 +603,6 @@ turbosound turbosound
 	.IOA_in(0),
 	.IOB_in(0)
 );
-
-/*
-// Single AY/YM chip
-ym2149 ym2149
-(
-	.CLK(clk_sys),
-	.CE(ce_psg),
-	.RESET(reset | psg_reset),
-	.BDIR(psg_we),
-	.BC(addr[14]),
-	.DI(cpu_dout),
-	.DO(sound_data),
-	.CHANNEL_A(psg_ch_a),
-	.CHANNEL_B(psg_ch_b),
-	.CHANNEL_C(psg_ch_c),
-	.SEL(0),
-	.MODE(0),
-
-	.IOA_in(0),
-	.IOB_in(0)
-);
-*/
 
 assign AUDIO_L = {{1'b0, psg_ch_a, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000}, 6'd0};
 assign AUDIO_R = {{1'b0, psg_ch_c, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000}, 6'd0};
