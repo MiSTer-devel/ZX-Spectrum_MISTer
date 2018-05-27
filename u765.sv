@@ -214,14 +214,14 @@ always @(posedge clk_sys) begin
 	reg [7:0] r;
 	reg [7:0] n;
 	reg [7:0] eot;
-	reg [7:0] gpl;
+	//reg [7:0] gpl;
 	reg [7:0] dtl;
 	reg [7:0] sc;
-	reg [7:0] d;
+	//reg [7:0] d;
 
-	reg mt;
-	reg mfm;
-	reg sk;
+	//reg mt;
+	//reg mfm;
+	//reg sk;
 	reg int_state;
 
 	old_wr <= wr;
@@ -359,9 +359,9 @@ always @(posedge clk_sys) begin
 				m_status[UPD765_MAIN_RQM] <= 1;
 
 				if (~old_wr & wr & a0) begin
-					mt <= din[7];
-					mfm <= din[6];
-					sk <= din[5];
+					//mt <= din[7];
+					//mfm <= din[6];
+					//sk <= din[5];
 					substate <= 0;
 					casex (din[7:0])
 						8'bXXX00110: state <= COMMAND_READ_DATA;
@@ -788,13 +788,13 @@ always @(posedge clk_sys) begin
 
 			COMMAND_FORMAT_TRACK3:
 			if (~old_wr & wr & a0) begin
-				gpl <= din;
+				//gpl <= din;
 				state <= COMMAND_FORMAT_TRACK4;
 			end
 
 			COMMAND_FORMAT_TRACK4:
 			if (~old_wr & wr & a0) begin
-				d <= din;
+				//d <= din;
 				m_status[UPD765_MAIN_EXM] <= 1;
 				state <= COMMAND_FORMAT_TRACK5;
 			end
@@ -883,7 +883,7 @@ always @(posedge clk_sys) begin
 							substate <= 6;
 						end
 					6:	begin
-							gpl <= din;
+							//gpl <= din;
 							substate <= 7;
 						end
 					7: begin
@@ -970,6 +970,8 @@ end
 
 endmodule
 
+// altera message_off 10720
+// altera message_off 276027
 module u765_dpram #(parameter DATAWIDTH=8, ADDRWIDTH=11)
 (
 	input	                clock,
