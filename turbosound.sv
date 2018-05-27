@@ -49,9 +49,9 @@ wire [7:0] psg_ch_b_1;
 wire [7:0] psg_ch_c_1;
 
 // Mixed channel data
-wire [7:0] sum_ch_a;
-wire [7:0] sum_ch_b;
-wire [7:0] sum_ch_c;
+wire [8:0] sum_ch_a;
+wire [8:0] sum_ch_b;
+wire [8:0] sum_ch_c;
 
 // Mixed channel data (normalized)
 wire [7:0] mix_ch_a;
@@ -123,15 +123,15 @@ assign DO = ay_select ? DO_1 : DO_0;
 assign ay0_playing = | ay0_active; // OR reduction (all bits of ay0_active OR'ed with each other)
 assign ay1_playing = | ay1_active; // OR reduction (all bits of ay1_active OR'ed with each other)
 
-// Mix channel signals from both AY/YM chips
-assign sum_ch_a = psg_ch_a_1 + psg_ch_a_0;
-assign sum_ch_b = psg_ch_b_1 + psg_ch_b_0;
-assign sum_ch_c = psg_ch_c_1 + psg_ch_c_0;
+// Mix channel signals from both AY/YM chips (extending to 9 bits width to prevent clipping)
+assign sum_ch_a = { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };
+assign sum_ch_b = { 1'b0, psg_ch_b_1 } + { 1'b0, psg_ch_b_0 };
+assign sum_ch_c = { 1'b0, psg_ch_c_1 } + { 1'b0, psg_ch_c_0 };
 
-// Ensure that output signals are within 5-bits range to avoid samples clipping
-assign mix_ch_a = { 3'b000, sum_ch_a[5:1] };
-assign mix_ch_b = { 3'b000, sum_ch_b[5:1] };
-assign mix_ch_c = { 3'b000, sum_ch_c[5:1] };
+// Fit samples back to 8-bit
+assign mix_ch_a = sum_ch_a[8:1];
+assign mix_ch_b = sum_ch_b[8:1];
+assign mix_ch_c = sum_ch_c[8:1];
 
 
 // Control output channels (Only AY_1 plays if not in TurboSound mode)
