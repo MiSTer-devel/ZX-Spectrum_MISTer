@@ -16,8 +16,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Multiface 128 and Multiface 3 (in +3 mode) add-on.
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
-- Kempston Joystick (as joystick 1).
-- Sinclair Joystick I (as joystick 2).
+- Joysticks: Kempston, Sinclair I/II, Cursor
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.

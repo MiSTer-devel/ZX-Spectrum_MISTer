@@ -128,8 +128,9 @@ localparam CONF_STR1 = {
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"-;",
 	"O23,Stereo mix,none,25%,50%,100%;",
+	"-;",
+	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"-;",
 	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
@@ -138,7 +139,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.82.",`BUILD_DATE
+	"V,v3.83.",`BUILD_DATE
 };
 
 
@@ -362,12 +363,12 @@ always_comb begin
 		'b001XXXXXXXX: cpu_din = rom_dout;
 		'b1XX01XXXXXX: cpu_din = fdd_dout;
 		'b1XX001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
-		'b1XX0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joystick_0[5:0]};
+		'b1XX0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
 		'b1XX00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
 		'b1XX0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
 		'b1XX00000101: cpu_din = ulap_dout;
 		'b1XX00000100: cpu_din = port_ff;
-		'b1XX000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & ({5{addr[12]}} | ~{joystick_1[1:0], joystick_1[2], joystick_1[3], joystick_1[4]})};
+		'b1XX000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
 		'b1XX1XXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
@@ -651,10 +652,27 @@ always @(posedge clk_sys) begin
 	reg old_status = 0;
 	old_status <= ps2_mouse[24];
 
-	if(joystick_0[5:0]) mouse_sel <= 0;
+	if(joyk) mouse_sel <= 0;
 	if(old_status != ps2_mouse[24]) mouse_sel <= 1;
 end
 
+wire [2:0] jsel = status[19:17];
+
+//kempston port 1F
+wire [5:0] joyk   = !jsel ? (joystick_0[5:0] | joystick_1[5:0]) : 6'd0;
+
+//sinclair 1 67890
+wire [4:0] joys1 = ({5{jsel[0]}} & {joystick_0[1:0], joystick_0[2], joystick_0[3], joystick_0[4]}) | ({5{jsel[1:0]==1}} & {joystick_1[1:0], joystick_1[2], joystick_1[3], joystick_1[4]});
+
+//sinclair 2 12345
+wire [4:0] joys2 = ({5{jsel[1]}} & {joystick_1[4:2], joystick_1[0], joystick_1[1]})                | ({5{jsel[1:0]==2}} & {joystick_0[4:2],joystick_0[0],joystick_0[1]});
+
+//cursor 56780
+wire [4:0] joyc1 = {5{jsel[2]}} & ({joystick_0[2], joystick_0[3], joystick_0[0],1'b0, joystick_0[4]} | {joystick_1[2], joystick_1[3], joystick_1[0], 1'b0, joystick_1[4]});
+wire [4:0] joyc2 = {5{jsel[2]}} & {joystick_0[1] | joystick_1[1], 4'b0000};
+
+//map to keyboard
+wire [4:0] joy_kbd = ({5{addr[12]}} | ~(joys1 | joyc1)) & ({5{addr[11]}} | ~(joys2 | joyc2));
 
 //////////////////   MF128   ///////////////////
 reg         mf128_mem;
