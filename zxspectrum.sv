@@ -762,7 +762,7 @@ always @(posedge clk_sys) begin
 	old_wr <= io_wr;
 	old_m1 <= m1;
 
-	psg_reset <= (addr == 'h66); // reset AY upon NMI.
+	psg_reset <= m1 && (addr == 'h66); // reset AY upon NMI.
 
 	if(plusd_en) begin
 		trdos_en <= 0;
