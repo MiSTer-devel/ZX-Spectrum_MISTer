@@ -129,17 +129,17 @@ localparam CONF_STR1 = {
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"O23,Stereo mix,none,25%,50%,100%;",
-	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"-;",
-	"ODE,Features,ULA+ & Timex,ULA+,Timex,None;",
+	"OD,Port #FF,Timex,SAA1099;",
+	"OE,ULA+,Enabled,Disabled;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
 };
 
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.83.",`BUILD_DATE
+	"V,v3.85.",`BUILD_DATE
 };
 
 
@@ -584,13 +584,16 @@ wire [7:0] psg_ch_c;
 wire       psg_enable = addr[0] & addr[15] & ~addr[1];
 wire       psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
 reg        psg_reset;
+reg        psg_active;
+
+wire       aud_reset = reset | psg_reset;
 
 // Turbosound card (Dual AY/YM chips)
 turbosound turbosound
 (
 	.CLK(clk_sys),
 	.CE(ce_psg),
-	.RESET(reset | psg_reset),
+	.RESET(aud_reset),
 	.BDIR(psg_we),
 	.BC(addr[14]),
 	.DI(cpu_dout),
@@ -598,6 +601,7 @@ turbosound turbosound
 	.CHANNEL_A(psg_ch_a),
 	.CHANNEL_B(psg_ch_b),
 	.CHANNEL_C(psg_ch_c),
+	.ACTIVE(psg_active),
 	.SEL(0),
 	.MODE(0),
 
@@ -605,9 +609,34 @@ turbosound turbosound
 	.IOB_in(0)
 );
 
-assign AUDIO_L = {{1'b0, psg_ch_a, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000}, 6'd0};
-assign AUDIO_R = {{1'b0, psg_ch_c, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000}, 6'd0};
+reg  ce_saa;  //8MHz
+always @(negedge clk_sys) begin
+	reg [3:0] counter = 0;
 
+	counter <=  counter + 1'd1;
+	if(counter == 13) counter <= 0;
+	
+	ce_saa <= !counter;
+end
+
+wire [7:0] saa_ch_l;
+wire [7:0] saa_ch_r;
+
+saa1099 psg
+(
+	.clk_sys(clk_sys),
+	.ce(ce_saa),
+	.rst_n(~aud_reset),
+	.cs_n((addr[7:0] != 255) | nIORQ | ulap_tmx_ena[1]),
+	.a0(addr[8]),
+	.wr_n(nWR),
+	.din(cpu_dout),
+	.out_l(saa_ch_l),
+	.out_r(saa_ch_r)
+);
+
+assign AUDIO_L = {{1'b0, psg_ch_a, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000} + ({saa_ch_l, 2'b00}>>psg_active), 6'd0};
+assign AUDIO_R = {{1'b0, psg_ch_c, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000} + ({saa_ch_r, 2'b00}>>psg_active), 6'd0};
 
 ////////////////////   VIDEO   ///////////////////
 wire        ce_cpu_sn;

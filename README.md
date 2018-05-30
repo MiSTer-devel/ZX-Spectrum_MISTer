@@ -18,6 +18,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Kempston Mouse.
 - Joysticks: Kempston, Sinclair I/II, Cursor
 - Turbo-sound (dual YM2149)
+- SAA1099
 
 ### Installation:
 Copy the *.rbf file at the root of the SD card.
