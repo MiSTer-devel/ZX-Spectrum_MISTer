@@ -102,7 +102,7 @@ module emu
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
-assign AUDIO_S   = 0;
+assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[3:2];
 
 assign LED_USER  = ioctl_download | tape_led;
@@ -139,7 +139,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.85.",`BUILD_DATE
+	"V,v3.87.",`BUILD_DATE
 };
 
 
@@ -577,36 +577,41 @@ end
 
 
 ////////////////////   AUDIO   ///////////////////
-wire [7:0] sound_data;
-wire [7:0] psg_ch_a;
-wire [7:0] psg_ch_b;
-wire [7:0] psg_ch_c;
-wire       psg_enable = addr[0] & addr[15] & ~addr[1];
-wire       psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
-reg        psg_reset;
-reg        psg_active;
+wire  [7:0] sound_data;
+wire [11:0] psg_ch_l, psg_ch_r;
+wire        psg_enable = addr[0] & addr[15] & ~addr[1];
+wire        psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
+reg         psg_reset;
+reg         psg_active;
 
-wire       aud_reset = reset | psg_reset;
+wire        aud_reset = reset | psg_reset;
 
-// Turbosound card (Dual AY/YM chips)
+reg  ce_opn; //1.285714MHz
+always @(negedge clk_sys) begin
+	reg [6:0] counter = 0;
+
+	counter <=  counter + 1'd1;
+	if(counter == 86) counter <= 0;
+	
+	ce_opn <= !counter;
+end
+
+// Turbosound FM: dual YM2203 chips
 turbosound turbosound
 (
-	.CLK(clk_sys),
-	.CE(ce_psg),
 	.RESET(aud_reset),
+	.CLK(clk_sys),
+	.CE_CPU(ce_cpu),
+	.CE_OPN(ce_opn),
+	.CE_PSG(ce_psg),
 	.BDIR(psg_we),
 	.BC(addr[14]),
 	.DI(cpu_dout),
 	.DO(sound_data),
-	.CHANNEL_A(psg_ch_a),
-	.CHANNEL_B(psg_ch_b),
-	.CHANNEL_C(psg_ch_c),
-	.ACTIVE(psg_active),
+	.CHANNEL_L(psg_ch_l),
+	.CHANNEL_R(psg_ch_r),
 	.SEL(0),
-	.MODE(0),
-
-	.IOA_in(0),
-	.IOB_in(0)
+	.MODE(0)
 );
 
 reg  ce_saa;  //8MHz
@@ -635,8 +640,15 @@ saa1099 psg
 	.out_r(saa_ch_r)
 );
 
-assign AUDIO_L = {{1'b0, psg_ch_a, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000} + ({saa_ch_l, 2'b00}>>psg_active), 6'd0};
-assign AUDIO_R = {{1'b0, psg_ch_c, 1'b0} + {2'b00, psg_ch_b} + {2'b00, ear_out, mic_out, tape_in, 5'b00000} + ({saa_ch_r, 2'b00}>>psg_active), 6'd0};
+wire [11:0] audio_l = psg_ch_l + {2'b00, saa_ch_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+wire [11:0] audio_r = psg_ch_r + {2'b00, saa_ch_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+
+compressor compressor
+(
+	clk_sys,
+	audio_l, audio_r,
+	AUDIO_L, AUDIO_R
+);
 
 ////////////////////   VIDEO   ///////////////////
 wire        ce_cpu_sn;

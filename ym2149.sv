@@ -62,7 +62,9 @@ module ym2149
 
 	input        SEL,
 	input        MODE,
+	
 	output [5:0] ACTIVE,
+	input        LIMIT_REG,
 
 	input  [7:0] IOA_in,
 	output [7:0] IOA_out,
@@ -233,6 +235,7 @@ always @(posedge CLK) begin
 	reg env_reset;
 	reg env_hold;
 	reg env_inc;
+	reg psg_reg;
 
 	// envelope shapes
 	// C AtAlH
@@ -278,8 +281,9 @@ always @(posedge CLK) begin
 	end else begin
 		old_BDIR <= BDIR;
 		if(~old_BDIR & BDIR) begin
-			if(BC) addr <= DI[3:0];
-			else begin 
+			if(BC) {psg_reg,addr} <= {~(LIMIT_REG & |DI[7:4]), DI[3:0]};
+			else 
+			if (psg_reg) begin
 				ymreg[addr] <= DI;
 				env_reset <= (addr == 13);
 			end
