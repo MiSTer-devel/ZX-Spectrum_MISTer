@@ -17,7 +17,8 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
 - Joysticks: Kempston, Sinclair I/II, Cursor
-- Turbo-sound (dual YM2149)
+- Classic YM2149(AY8910)
+- Turbosound-FM (dual YM2203 incl. dual YM2149)
 - SAA1099
 
 ### Installation:
