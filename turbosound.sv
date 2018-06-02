@@ -22,143 +22,100 @@
 
 module turbosound
 (
+	input         RESET,	    // Chip RESET (set all Registers to '0', active high)
+
 	input         CLK,		 // Global clock
 	input         CE_CPU,    // CPU Clock enable
-	input         CE_PSG,    // PSG Clock enable
-	input         CE_OPN,    // FM syn Clock enable
-	input         RESET,	    // Chip RESET (set all Registers to '0', active high)
+	input         CE_YM,     // YM2203 Master Clock enable x2 (due to YM2612 model!)
 	input         BDIR,	    // Bus Direction (0 - read , 1 - write)
 	input         BC,		    // Bus control
 	input   [7:0] DI,	       // Data In
 	output  [7:0] DO,	       // Data Out
 	output [11:0] CHANNEL_L, // Output channel L
 	output [11:0] CHANNEL_R, // Output channel R
-	output        ACTIVE,
-	input         SEL,
-	input         MODE
+	output        ACTIVE
 );
-
 
 // AY1 selected by default
 reg ay_select = 1;
-
-reg stat_sel = 1;
-reg fm_ena = 0;
+reg stat_sel  = 1;
+reg fm_ena    = 0;
 
 always_ff @(posedge CLK or posedge RESET) begin
 	if (RESET) begin
-		// Select AY1 after reset
 		ay_select <= 1;
-		fm_ena <= 0;
-		stat_sel <= 1;
+		stat_sel  <= 1;
+		fm_ena    <= 0;
 	end
 	else if (BDIR & BC & &DI[7:3]) begin
-		// Select AY0 or AY1 according to lower bit of data register (1111 1FSN)
-		ay_select <= DI[0];
-		stat_sel <= DI[1];
-		fm_ena <= ~DI[2];
+		ay_select <=  DI[0];
+		stat_sel  <=  DI[1];
+		fm_ena    <= ~DI[2];
 	end
 end
 
-wire BDIR_0 = ~ay_select & BDIR;
+wire  [7:0] psg_ch_a_0;
+wire  [7:0] psg_ch_b_0;
+wire  [7:0] psg_ch_c_0;
+wire [11:0] opn_0;
+wire  [7:0] DO_0;
 
-// AY0 channel output data
-wire [7:0] psg_ch_a_0;
-wire [7:0] psg_ch_b_0;
-wire [7:0] psg_ch_c_0;
-wire [5:0] ay0_active;
-wire [7:0] DO_0;
+wire WE_0 = ~ay_select & BDIR;
+wire ay0_playing;
 
-ym2149 ym2149_0
+ym2203 ym2203_0
 (
-	.CLK(CLK),
-	.CE(CE_PSG),
 	.RESET(RESET),
-	.BDIR(BDIR_0),
-	.BC(BC),
-	.LIMIT_REG(fm_ena),
+	.CLK(CLK),
+	.CE_CPU(CE_CPU),
+	.CE_YM(CE_YM),
+
+	.A0(WE_0 ? ~BC : stat_sel),
+	.WE(WE_0),
 	.DI(DI),
 	.DO(DO_0),
+
 	.CHANNEL_A(psg_ch_a_0),
 	.CHANNEL_B(psg_ch_b_0),
 	.CHANNEL_C(psg_ch_c_0),
-	.ACTIVE(ay0_active),
-	.SEL(SEL),
-	.MODE(MODE)
+	.CHANNEL_FM(opn_0),
+
+	.PSG_ACTIVE(ay0_playing),
+	.FM_ENA(fm_ena)
 );
 
+wire  [7:0] psg_ch_a_1;
+wire  [7:0] psg_ch_b_1;
+wire  [7:0] psg_ch_c_1;
+wire [11:0] opn_1;
+wire  [7:0] DO_1;
 
-wire BDIR_1 =  ay_select & BDIR;
+wire WE_1 = ay_select & BDIR;
+wire ay1_playing;
 
-// AY1 channel output data
-wire [7:0] psg_ch_a_1;
-wire [7:0] psg_ch_b_1;
-wire [7:0] psg_ch_c_1;
-wire [5:0] ay1_active;
-wire [7:0] DO_1;
-
-// AY1 (Default AY)
-ym2149 ym2149_1
+ym2203 ym2203_1
 (
-	.CLK(CLK),
-	.CE(CE_PSG),
 	.RESET(RESET),
-	.BDIR(BDIR_1),
-	.BC(BC),
-	.LIMIT_REG(fm_ena),
+	.CLK(CLK),
+	.CE_CPU(CE_CPU),
+	.CE_YM(CE_YM),
+
+	.A0(WE_1 ? ~BC : stat_sel),
+	.WE(WE_1),
 	.DI(DI),
 	.DO(DO_1),
+
 	.CHANNEL_A(psg_ch_a_1),
 	.CHANNEL_B(psg_ch_b_1),
 	.CHANNEL_C(psg_ch_c_1),
-	.ACTIVE(ay1_active),
-	.SEL(SEL),
-	.MODE(MODE)
+	.CHANNEL_FM(opn_1),
+
+	.PSG_ACTIVE(ay1_playing),
+	.FM_ENA(fm_ena)
 );
 
-
-//only 11 bits are actually used due to half-chip usage
-wire [11:0] opn_0, opn_1;
-wire  [7:0] opn_dout_0, opn_dout_1;
-
-jt12 fm_0
-(
-	.rst(RESET),
-
-	.cpu_clk(CLK & CE_CPU),
-	.cpu_din(DI),
-	.cpu_dout(opn_dout_0),
-	.cpu_addr(~BC),
-	.cpu_cs_n(0),
-	.cpu_wr_n(~BDIR_0),
-
-	.syn_clk(CLK & CE_OPN),
-	.cpu_limiter_en(1),
-	.syn_snd_right(opn_0)
-);
-
-jt12 fm_1
-(
-	.rst(RESET),
-
-	.cpu_clk(CLK & CE_CPU),
-	.cpu_din(DI),
-	.cpu_dout(opn_dout_1),
-	.cpu_addr(~BC),
-	.cpu_cs_n(0),
-	.cpu_wr_n(~BDIR_1),
-
-	.syn_clk(CLK & CE_OPN),
-	.cpu_limiter_en(1),
-	.syn_snd_right(opn_1)
-);
-
-assign DO = stat_sel ? (ay_select ? DO_1 : DO_0) : (ay_select ? opn_dout_1 : opn_dout_0);
+assign DO = ay_select ? DO_1 : DO_0;
 assign ACTIVE = ay0_playing | ay1_playing | fm_ena;
-
-// AY activity signals
-wire ay0_playing = |ay0_active; // OR reduction (all bits of ay0_active OR'ed with each other)
-wire ay1_playing = |ay1_active; // OR reduction (all bits of ay1_active OR'ed with each other)
 
 // Mix channel signals from both AY/YM chips (extending to 9 bits width to prevent clipping)
 wire [8:0] sum_ch_a = { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };

@@ -118,7 +118,7 @@ localparam CONF_PLUS3 = "(+3) ";
 
 `include "build_id.v"
 localparam CONF_STR1 = {
-	"SPECTRUM;;",
+	"Spectrum;;",
 	"-;",
 	"S,TRDIMGDSKMGT,Load Disk;",
 	"-;",
@@ -130,7 +130,6 @@ localparam CONF_STR1 = {
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
-	"-;",
 	"OD,Port #FF,Timex,SAA1099;",
 	"OE,ULA+,Enabled,Disabled;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
@@ -160,7 +159,7 @@ pll pll
 );
 
 
-reg  ce_psg;  //1.75MHz
+reg  ce_ym;  //7MHz
 reg  ce_7mp;
 reg  ce_7mn;
 reg  ce_28m;
@@ -185,7 +184,7 @@ always @(negedge clk_sys) begin
 	ce_28m  <= !counter[1:0];
 	ce_7mp  <= !counter[3] & !counter[2:0];
 	ce_7mn  <=  counter[3] & !counter[2:0];
-	ce_psg  <= !counter[5:0] & ~pause;
+	ce_ym   <= !counter[3:0] & ~pause;
 
 	ce_cpu_tp <= !(counter & turbo);
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
@@ -586,32 +585,19 @@ reg         psg_active;
 
 wire        aud_reset = reset | psg_reset;
 
-reg  ce_opn; //1.285714MHz
-always @(negedge clk_sys) begin
-	reg [6:0] counter = 0;
-
-	counter <=  counter + 1'd1;
-	if(counter == 86) counter <= 0;
-	
-	ce_opn <= !counter;
-end
-
 // Turbosound FM: dual YM2203 chips
 turbosound turbosound
 (
 	.RESET(aud_reset),
 	.CLK(clk_sys),
 	.CE_CPU(ce_cpu),
-	.CE_OPN(ce_opn),
-	.CE_PSG(ce_psg),
+	.CE_YM(ce_ym),
 	.BDIR(psg_we),
 	.BC(addr[14]),
 	.DI(cpu_dout),
 	.DO(sound_data),
 	.CHANNEL_L(psg_ch_l),
-	.CHANNEL_R(psg_ch_r),
-	.SEL(0),
-	.MODE(0)
+	.CHANNEL_R(psg_ch_r)
 );
 
 reg  ce_saa;  //8MHz
