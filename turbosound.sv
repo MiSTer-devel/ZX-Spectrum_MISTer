@@ -57,7 +57,7 @@ end
 wire  [7:0] psg_ch_a_0;
 wire  [7:0] psg_ch_b_0;
 wire  [7:0] psg_ch_c_0;
-wire [11:0] opn_0;
+wire [10:0] opn_0;
 wire  [7:0] DO_0;
 
 wire WE_0 = ~ay_select & BDIR;
@@ -87,7 +87,7 @@ ym2203 ym2203_0
 wire  [7:0] psg_ch_a_1;
 wire  [7:0] psg_ch_b_1;
 wire  [7:0] psg_ch_c_1;
-wire [11:0] opn_1;
+wire [10:0] opn_1;
 wire  [7:0] DO_1;
 
 wire WE_1 = ay_select & BDIR;
@@ -129,7 +129,7 @@ wire [7:0] psg_c = ~ay0_playing ? psg_ch_c_1 : sum_ch_c[8:1];
 
 wire signed [11:0] psg_l = {3'b000, psg_a, 1'd0} + {4'b0000, psg_b};
 wire signed [11:0] psg_r = {3'b000, psg_c, 1'd0} + {4'b0000, psg_b};
-wire signed [11:0] opn_s = {opn_0[11], opn_0[11:1]} + {opn_1[11], opn_1[11:1]};
+wire signed [11:0] opn_s = {{2{opn_0[10]}}, opn_0[10:1]} + {{2{opn_1[10]}}, opn_1[10:1]};
 
 assign CHANNEL_L = fm_ena ? opn_s + psg_l : psg_l;
 assign CHANNEL_R = fm_ena ? opn_s + psg_r : psg_r;

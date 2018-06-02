@@ -33,7 +33,7 @@ module ym2203
 	output  [7:0] CHANNEL_A, // PSG Output channel A
 	output  [7:0] CHANNEL_B, // PSG Output channel B
 	output  [7:0] CHANNEL_C, // PSG Output channel C
- 	output [11:0] CHANNEL_FM,// FM Output channel
+ 	output [10:0] CHANNEL_FM,// FM Output channel
 
 	output        PSG_ACTIVE,
 	input         FM_ENA
@@ -59,7 +59,7 @@ always @(posedge CLK) begin
 				endcase
 			end
 		end
-		if(~A0) psg_ena <= ~|DI[7:4] | ~FM_ENA;
+		if(~A0) psg_ena <= (~|DI[7:4]) | (~FM_ENA);
 	end
 end
 
@@ -110,6 +110,7 @@ ym2149 ym2149
 );
 
 wire  [7:0] opn_dout;
+wire [11:0] opn_audio;
 jt12 jt12
 (
 	.rst(RESET),
@@ -123,10 +124,11 @@ jt12 jt12
 
 	.syn_clk(CLK & ce_opn),
 	.cpu_limiter_en(1'b1),
-	.syn_snd_right(CHANNEL_FM)
+	.syn_snd_right(opn_audio)
 );
 
 assign DO = A0 ? psg_dout : opn_dout;
 assign PSG_ACTIVE = |psg_active;
+assign CHANNEL_FM = opn_audio[10:0];
 
 endmodule
