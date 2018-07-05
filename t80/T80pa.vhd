@@ -1,7 +1,5 @@
 --
--- Z80 compatible microprocessor core, preudo-asynchronous top level
---
--- Version : 0247pa
+-- Z80 compatible microprocessor core, preudo-asynchronous top level (by Sorgelig)
 --
 -- Copyright (c) 2001-2002 Daniel Wallner (jesus@opencores.org)
 --
@@ -40,25 +38,13 @@
 -- The latest version of this file can be found at:
 --	http://www.opencores.org/cvsweb.shtml/t80/
 --
--- Limitations :
---
 -- File history :
 --
---	0208 : First complete release
+-- v1.0: convert to preudo-asynchronous model with original Z80 timings.
 --
---	0211 : Fixed interrupt cycle
+-- v2.0: rewritten for more precise timings.
+--       support for both CEN_n and CEN_p set to 1. Effective clock will be CLK/2.
 --
---	0235 : Updated for T80 interface change
---
---	0238 : Updated for T80 interface change
---
---	0240 : Updated for T80 interface change
---
---	0242 : Updated for T80 interface change
---
---	0247 : Fixed bus req/ack cycle
---
--- 0247pa: convert to preudo-asynchronous model with original Z80 timings (by Sorgelig).
 --
 
 library IEEE;
@@ -100,113 +86,110 @@ architecture rtl of T80pa is
 	signal IORQ				: std_logic;
 	signal NoRead			: std_logic;
 	signal Write			: std_logic;
-	signal MREQ				: std_logic;
-	signal MReq_Inhibit	: std_logic;
-	signal Req_Inhibit	: std_logic;
-	signal RD				: std_logic;
 	signal BUSAK			: std_logic;
 	signal DI_Reg			: std_logic_vector (7 downto 0);	-- Input synchroniser
 	signal Wait_s			: std_logic;
 	signal MCycle			: std_logic_vector(2 downto 0);
 	signal TState			: std_logic_vector(2 downto 0);
-	signal CEN_ne			: std_logic;
+	signal CEN_pol			: std_logic;
 
 begin
 
-	MREQ_n <= not MREQ or (Req_Inhibit and MReq_Inhibit);
-	RD_n <= not RD or Req_Inhibit;
 	BUSAK_n <= BUSAK;
 
 	u0 : T80
 		generic map(
-			Mode => Mode,
-			IOWait => 1)
+			Mode    => Mode,
+			IOWait  => 1
+		)
 		port map(
-			CEN => CEN_p,
-			M1_n => M1_n,
-			IORQ => IORQ,
-			NoRead => NoRead,
-			Write => Write,
-			RFSH_n => RFSH_n,
-			HALT_n => HALT_n,
-			WAIT_n => Wait_s,
-			INT_n => INT_n,
-			NMI_n => NMI_n,
+			CEN     => CEN_p and not CEN_pol,
+			M1_n    => M1_n,
+			IORQ    => IORQ,
+			NoRead  => NoRead,
+			Write   => Write,
+			RFSH_n  => RFSH_n,
+			HALT_n  => HALT_n,
+			WAIT_n  => Wait_s,
+			INT_n   => INT_n,
+			NMI_n   => NMI_n,
 			RESET_n => RESET_n,
 			BUSRQ_n => BUSRQ_n,
 			BUSAK_n => BUSAK,
-			CLK_n => CLK,
-			A => A,
-			DInst => DI,
-			DI => DI_Reg,
-			DO => DO,
-			REG => REG,
-			MC => MCycle,
-			TS => TState,
-			IntCycle_n => IntCycle_n);
+			CLK_n   => CLK,
+			A       => A,
+			DInst   => DI,     -- valid   at beginning of T3
+			DI      => DI_Reg, -- latched at middle    of T3
+			DO      => DO,
+			REG     => REG,
+			MC      => MCycle,
+			TS      => TState,
+			IntCycle_n => IntCycle_n
+		);
 
 	process(CLK)
 	begin
-		if CLK'event and CLK = '1' then
+		if rising_edge(CLK) then
 			if RESET_n = '0' then
-				WR_n <= '1';
-				Req_Inhibit <= '0';
-				MReq_Inhibit <= '0';
-				RD <= '0';
-				IORQ_n <= '1';
-				MREQ <= '0';
-				DI_Reg <= "00000000";
-				Wait_s <= '1';
-				CEN_ne <= '0';
-			elsif CEN_p = '1' then
-				WR_n <= '1';
-				if TState = "001" then
-					WR_n <= not Write;
-				end if;
-				if MCycle = "001" and TState = "010" then
-					Req_Inhibit <= '1';
+				WR_n    <= '1';
+				RD_n    <= '1';
+				IORQ_n  <= '1';
+				MREQ_n  <= '1';
+				DI_Reg  <= "00000000";
+				Wait_s  <= '1';
+				CEN_pol <= '0';
+			elsif CEN_p = '1' and CEN_pol = '0' then
+				CEN_pol <= '1';
+				if MCycle = "001" then
+					if TState = "010" then
+						MREQ_n <= '1';
+						RD_n   <= '1';
+					end if;
 				else
-					Req_Inhibit <= '0';
+					if TState = "001" and IORQ = '1' then
+						WR_n   <= not Write;
+						RD_n   <= Write;
+						IORQ_n <= '0';
+					end if;
 				end if;
-				CEN_ne <= '1';
-			elsif CEN_n = '1' and CEN_ne = '1' then
+			elsif CEN_n = '1' and CEN_pol = '1' then
+				CEN_pol <= '0';
 				Wait_s <= WAIT_n;
 				if TState = "011" and BUSAK = '1' then
 					DI_Reg <= DI;
 				end if;
-				if MCycle = "001" and TState = "010" then
-					MReq_Inhibit <= '1';
-				else
-					MReq_Inhibit <= '0';
-				end if;
 				if MCycle = "001" then
 					if TState = "001" then
-						RD <= IntCycle_n;
-						MREQ <= IntCycle_n;
+						RD_n   <= not IntCycle_n;
+						MREQ_n <= not IntCycle_n;
 						IORQ_n <= IntCycle_n;
 					end if;
 					if TState = "011" then
-						RD <= '0';
+						RD_n   <= '1';
 						IORQ_n <= '1';
-						MREQ <= '1';
+						MREQ_n <= '0';
 					end if;
 					if TState = "100" then
-						MREQ <= '0';
+						MREQ_n <= '1';
 					end if;
 				else
-					if TState = "001" and NoRead = '0' then
-						RD <= not Write;
-						IORQ_n <= not IORQ;
-						MREQ <= not IORQ;
+					if NoRead = '0' and IORQ = '0' then
+						if TState = "001" then
+							RD_n   <= Write;
+							MREQ_n <= '0';
+						end if;
+						if TState = "010" then
+							WR_n   <= not Write;
+						end if;
 					end if;
 					if TState = "011" then
-						RD <= '0';
+						WR_n   <= '1';
+						RD_n   <= '1';
 						IORQ_n <= '1';
-						MREQ <= '0';
+						MREQ_n <= '1';
 					end if;
 				end if;
 			end if;
 		end if;
 	end process;
-
 end;
