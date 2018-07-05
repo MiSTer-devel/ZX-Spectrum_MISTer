@@ -244,12 +244,11 @@ video_mixer #(.LINE_LENGTH(896), .HALF_DEPTH(1)) video_mixer
 
 ///////////////////////////////////////////////////////////////////////////////
 
-reg  nIORQ_T2; //T80 has incorrect nIORQ signal activated at T1 instead of T2.
 reg  CPUClk;
 reg  ioreqtw3;
 reg  mreqt23;
 
-wire ioreq_n    = (addr[0] & ~ulap_acc) | nIORQ_T2 | nIORQ;
+wire ioreq_n    = (addr[0] & ~ulap_acc) | nIORQ;
 wire ulaContend = (hc[2] | hc[3]) & ~Border & CPUClk & ioreqtw3;
 wire memContend = nRFSH & ioreq_n & mreqt23 & ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
 wire ioContend  = ~ioreq_n;
@@ -267,7 +266,6 @@ always @(negedge clk_sys) begin
 		if(~CPUClk &  next_clk) begin
 			ioreqtw3 <= ioreq_n;
 			mreqt23  <= nMREQ;
-			nIORQ_T2 <= nIORQ;
 		end
 	end
 end
