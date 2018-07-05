@@ -1,3 +1,13 @@
+--------------------------------------------------------------------------------
+-- ****
+-- T80(b) core. In an effort to merge and maintain bug fixes ....
+--
+--
+-- Ver 300 started tidyup
+-- MikeJ March 2005
+-- Latest version from www.fpgaarcade.com (original www.opencores.org)
+--
+-- ****
 --
 -- T80 Registers, technology independent
 --
@@ -55,36 +65,36 @@ use IEEE.numeric_std.all;
 
 entity T80_Reg is
 	port(
-		Clk			: in std_logic;
-		CEN			: in std_logic;
-		WEH			: in std_logic;
-		WEL			: in std_logic;
-		AddrA		: in std_logic_vector(2 downto 0);
-		AddrB		: in std_logic_vector(2 downto 0);
-		AddrC		: in std_logic_vector(2 downto 0);
-		DIH			: in std_logic_vector(7 downto 0);
-		DIL			: in std_logic_vector(7 downto 0);
-		DOAH		: out std_logic_vector(7 downto 0);
-		DOAL		: out std_logic_vector(7 downto 0);
-		DOBH		: out std_logic_vector(7 downto 0);
-		DOBL		: out std_logic_vector(7 downto 0);
-		DOCH		: out std_logic_vector(7 downto 0);
-		DOCL		: out std_logic_vector(7 downto 0);
-		DOR		: out std_logic_vector(127 downto 0)
+		Clk     : in  std_logic;
+		CEN     : in  std_logic;
+		WEH     : in  std_logic;
+		WEL     : in  std_logic;
+		AddrA   : in  std_logic_vector(2 downto 0);
+		AddrB   : in  std_logic_vector(2 downto 0);
+		AddrC   : in  std_logic_vector(2 downto 0);
+		DIH     : in  std_logic_vector(7 downto 0);
+		DIL     : in  std_logic_vector(7 downto 0);
+		DOAH    : out std_logic_vector(7 downto 0);
+		DOAL    : out std_logic_vector(7 downto 0);
+		DOBH    : out std_logic_vector(7 downto 0);
+		DOBL    : out std_logic_vector(7 downto 0);
+		DOCH    : out std_logic_vector(7 downto 0);
+		DOCL    : out std_logic_vector(7 downto 0);
+		DOR     : out std_logic_vector(127 downto 0)
 	);
 end T80_Reg;
 
 architecture rtl of T80_Reg is
 
 	type Register_Image is array (natural range <>) of std_logic_vector(7 downto 0);
-	signal	RegsH	: Register_Image(0 to 7);
-	signal	RegsL	: Register_Image(0 to 7);
+	signal RegsH : Register_Image(0 to 7);
+	signal RegsL : Register_Image(0 to 7);
 
 begin
 
 	process (Clk)
 	begin
-		if Clk'event and Clk = '1' then
+		if rising_edge(Clk) then
 			if CEN = '1' then
 				if WEH = '1' then
 					RegsH(to_integer(unsigned(AddrA))) <= DIH;

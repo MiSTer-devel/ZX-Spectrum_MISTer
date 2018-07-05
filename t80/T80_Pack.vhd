@@ -1,3 +1,14 @@
+--------------------------------------------------------------------------------
+-- ****
+-- T80(b) core. In an effort to merge and maintain bug fixes ....
+--
+--
+-- Ver 303 add undocumented DDCB and FDCB opcodes by TobiFlex 20.04.2010
+-- Ver 300 started tidyup
+-- MikeJ March 2005
+-- Latest version from www.fpgaarcade.com (original www.opencores.org)
+--
+-- ****
 --
 -- Z80 compatible microprocessor core
 --
@@ -52,8 +63,8 @@ package T80_Pack is
 
 	component T80
 	generic(
-		Mode : integer := 0;	-- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
-		IOWait : integer := 0;	-- 1 => Single cycle I/O, 1 => Std I/O cycle
+		Mode   : integer := 0;  -- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
+		IOWait : integer := 0;  -- 0 => Single cycle I/O, 1 => Std I/O cycle
 		Flag_C : integer := 0;
 		Flag_N : integer := 1;
 		Flag_P : integer := 2;
@@ -64,57 +75,57 @@ package T80_Pack is
 		Flag_S : integer := 7
 	);
 	port(
-		RESET_n		: in std_logic;
-		CLK_n		: in std_logic;
-		CEN			: in std_logic;
-		WAIT_n		: in std_logic;
-		INT_n		: in std_logic;
-		NMI_n		: in std_logic;
-		BUSRQ_n		: in std_logic;
-		M1_n		: out std_logic;
-		IORQ		: out std_logic;
-		NoRead		: out std_logic;
-		Write		: out std_logic;
-		RFSH_n		: out std_logic;
-		HALT_n		: out std_logic;
-		BUSAK_n		: out std_logic;
-		A			: out std_logic_vector(15 downto 0);
-		DInst		: in std_logic_vector(7 downto 0);
-		DI			: in std_logic_vector(7 downto 0);
-		DO			: out std_logic_vector(7 downto 0);
-		MC			: out std_logic_vector(2 downto 0);
-		TS			: out std_logic_vector(2 downto 0);
-		IntCycle_n	: out std_logic;
-		IntE		: out std_logic;
-		Stop		: out std_logic;
-		REG			: out std_logic_vector(207 downto 0) -- IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		RESET_n         : in std_logic;
+		CLK_n           : in std_logic;
+		CEN             : in std_logic;
+		WAIT_n          : in std_logic;
+		INT_n           : in std_logic;
+		NMI_n           : in std_logic;
+		BUSRQ_n         : in std_logic;
+		M1_n            : out std_logic;
+		IORQ            : out std_logic;
+		NoRead          : out std_logic;
+		Write           : out std_logic;
+		RFSH_n          : out std_logic;
+		HALT_n          : out std_logic;
+		BUSAK_n         : out std_logic;
+		A               : out std_logic_vector(15 downto 0);
+		DInst           : in std_logic_vector(7 downto 0);
+		DI              : in std_logic_vector(7 downto 0);
+		DO              : out std_logic_vector(7 downto 0);
+		MC              : out std_logic_vector(2 downto 0);
+		TS              : out std_logic_vector(2 downto 0);
+		IntCycle_n      : out std_logic;
+		IntE            : out std_logic;
+		Stop            : out std_logic;
+		REG             : out std_logic_vector(207 downto 0) -- IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 	);
 	end component;
 
 	component T80_Reg
 	port(
-		Clk			: in std_logic;
-		CEN			: in std_logic;
-		WEH			: in std_logic;
-		WEL			: in std_logic;
-		AddrA		: in std_logic_vector(2 downto 0);
-		AddrB		: in std_logic_vector(2 downto 0);
-		AddrC		: in std_logic_vector(2 downto 0);
-		DIH			: in std_logic_vector(7 downto 0);
-		DIL			: in std_logic_vector(7 downto 0);
-		DOAH		: out std_logic_vector(7 downto 0);
-		DOAL		: out std_logic_vector(7 downto 0);
-		DOBH		: out std_logic_vector(7 downto 0);
-		DOBL		: out std_logic_vector(7 downto 0);
-		DOCH		: out std_logic_vector(7 downto 0);
-		DOCL		: out std_logic_vector(7 downto 0);
-		DOR		: out std_logic_vector(127 downto 0)
+		Clk             : in std_logic;
+		CEN             : in std_logic;
+		WEH             : in std_logic;
+		WEL             : in std_logic;
+		AddrA           : in std_logic_vector(2 downto 0);
+		AddrB           : in std_logic_vector(2 downto 0);
+		AddrC           : in std_logic_vector(2 downto 0);
+		DIH             : in std_logic_vector(7 downto 0);
+		DIL             : in std_logic_vector(7 downto 0);
+		DOAH            : out std_logic_vector(7 downto 0);
+		DOAL            : out std_logic_vector(7 downto 0);
+		DOBH            : out std_logic_vector(7 downto 0);
+		DOBL            : out std_logic_vector(7 downto 0);
+		DOCH            : out std_logic_vector(7 downto 0);
+		DOCL            : out std_logic_vector(7 downto 0);
+		DOR	            : out std_logic_vector(127 downto 0)
 	);
 	end component;
 
 	component T80_MCode
 	generic(
-		Mode : integer := 0;
+		Mode   : integer := 0;
 		Flag_C : integer := 0;
 		Flag_N : integer := 1;
 		Flag_P : integer := 2;
@@ -125,12 +136,12 @@ package T80_Pack is
 		Flag_S : integer := 7
 	);
 	port(
-		IR				: in std_logic_vector(7 downto 0);
-		ISet			: in std_logic_vector(1 downto 0);
-		MCycle			: in std_logic_vector(2 downto 0);
-		F				: in std_logic_vector(7 downto 0);
-		NMICycle		: in std_logic;
-		IntCycle		: in std_logic;
+		IR				: in  std_logic_vector(7 downto 0);
+		ISet			: in  std_logic_vector(1 downto 0);
+		MCycle			: in  std_logic_vector(2 downto 0);
+		F				: in  std_logic_vector(7 downto 0);
+		NMICycle		: in  std_logic;
+		IntCycle		: in  std_logic;
 		XY_State		: in  std_logic_vector(1 downto 0);
 		MCycles			: out std_logic_vector(2 downto 0);
 		TStates			: out std_logic_vector(2 downto 0);
@@ -140,8 +151,8 @@ package T80_Pack is
 		IncDec_16		: out std_logic_vector(3 downto 0); -- BC,DE,HL,SP   0 is inc
 		Read_To_Reg		: out std_logic;
 		Read_To_Acc		: out std_logic;
-		Set_BusA_To	: out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI/DB,A,SP(L),SP(M),0,F
-		Set_BusB_To	: out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI,A,SP(L),SP(M),1,F,PC(L),PC(M),0
+		Set_BusA_To	    : out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI/DB,A,SP(L),SP(M),0,F
+		Set_BusB_To	    : out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI,A,SP(L),SP(M),1,F,PC(L),PC(M),0
 		ALU_Op			: out std_logic_vector(3 downto 0);
 			-- ADD, ADC, SUB, SBC, AND, XOR, OR, CP, ROT, BIT, SET, RES, DAA, RLD, RRD, None
 		Save_ALU		: out std_logic;
@@ -185,7 +196,7 @@ package T80_Pack is
 
 	component T80_ALU
 	generic(
-		Mode : integer := 0;
+		Mode   : integer := 0;
 		Flag_C : integer := 0;
 		Flag_N : integer := 1;
 		Flag_P : integer := 2;
@@ -196,16 +207,16 @@ package T80_Pack is
 		Flag_S : integer := 7
 	);
 	port(
-		Arith16		: in std_logic;
-		Z16			: in std_logic;
-		ALU_Op		: in std_logic_vector(3 downto 0);
-		IR			: in std_logic_vector(5 downto 0);
-		ISet		: in std_logic_vector(1 downto 0);
-		BusA		: in std_logic_vector(7 downto 0);
-		BusB		: in std_logic_vector(7 downto 0);
-		F_In		: in std_logic_vector(7 downto 0);
-		Q			: out std_logic_vector(7 downto 0);
-		F_Out		: out std_logic_vector(7 downto 0)
+		Arith16         : in  std_logic;
+		Z16             : in  std_logic;
+		ALU_Op          : in  std_logic_vector(3 downto 0);
+		IR              : in  std_logic_vector(5 downto 0);
+		ISet            : in  std_logic_vector(1 downto 0);
+		BusA            : in  std_logic_vector(7 downto 0);
+		BusB            : in  std_logic_vector(7 downto 0);
+		F_In            : in  std_logic_vector(7 downto 0);
+		Q               : out std_logic_vector(7 downto 0);
+		F_Out           : out std_logic_vector(7 downto 0)
 	);
 	end component;
 

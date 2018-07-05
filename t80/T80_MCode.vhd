@@ -1,10 +1,17 @@
+--------------------------------------------------------------------------------
+-- ****
+-- T80(b) core. In an effort to merge and maintain bug fixes ....
 --
+-- Ver 303 add undocumented DDCB and FDCB opcodes by TobiFlex 20.04.2010
+-- Ver 300 started tidyup
+-- MikeJ March 2005
+-- Latest version from www.fpgaarcade.com (original www.opencores.org)
+--
+-- ****
 -- Z80 compatible microprocessor core
 --
 -- Version : 0242
---
 -- Copyright (c) 2001-2002 Daniel Wallner (jesus@opencores.org)
---
 -- All rights reserved
 --
 -- Redistribution and use in source and synthezised forms, with or without
@@ -38,33 +45,27 @@
 -- you have the latest version of this file.
 --
 -- The latest version of this file can be found at:
---	http://www.opencores.org/cvsweb.shtml/t80/
+--      http://www.opencores.org/cvsweb.shtml/t80/
 --
 -- Limitations :
 --
 -- File history :
 --
---	0208 : First complete release
+--      0208 : First complete release
+--      0211 : Fixed IM 1
+--      0214 : Fixed mostly flags, only the block instructions now fail the zex regression test
+--      0235 : Added IM 2 fix by Mike Johnson
+--      0238 : Added NoRead signal
+--      0238b: Fixed instruction timing for POP and DJNZ
+--      0240 : Added (IX/IY+d) states, removed op-codes from mode 2 and added all remaining mode 3 op-codes
+--      0240mj1 fix for HL inc/dec for INI, IND, INIR, INDR, OUTI, OUTD, OTIR, OTDR
+--      0242 : Fixed I/O instruction timing, cleanup
 --
---	0211 : Fixed IM 1
---
---	0214 : Fixed mostly flags, only the block instructions now fail the zex regression test
---
---	0235 : Added IM 2 fix by Mike Johnson
---
---	0238 : Added NoRead signal
---
---	0238b: Fixed instruction timing for POP and DJNZ
---
---	0240 : Added (IX/IY+d) states, removed op-codes from mode 2 and added all remaining mode 3 op-codes
---
---	0242 : Fixed I/O instruction timing, cleanup
---
--- altera message_off 10492
 
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
+use work.T80_Pack.all;
 
 entity T80_MCode is
 	generic(
@@ -94,8 +95,8 @@ entity T80_MCode is
 		IncDec_16		: out std_logic_vector(3 downto 0); -- BC,DE,HL,SP   0 is inc
 		Read_To_Reg		: out std_logic;
 		Read_To_Acc		: out std_logic;
-		Set_BusA_To	: out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI/DB,A,SP(L),SP(M),0,F
-		Set_BusB_To	: out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI,A,SP(L),SP(M),1,F,PC(L),PC(M),0
+		Set_BusA_To	    : out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI/DB,A,SP(L),SP(M),0,F
+		Set_BusB_To	    : out std_logic_vector(3 downto 0); -- B,C,D,E,H,L,DI,A,SP(L),SP(M),1,F,PC(L),PC(M),0
 		ALU_Op			: out std_logic_vector(3 downto 0);
 			-- ADD, ADC, SUB, SBC, AND, XOR, OR, CP, ROT, BIT, SET, RES, DAA, RLD, RRD, None
 		Save_ALU		: out std_logic;
@@ -139,20 +140,13 @@ end T80_MCode;
 
 architecture rtl of T80_MCode is
 
-	constant aNone	: std_logic_vector(2 downto 0) := "111";
-	constant aBC	: std_logic_vector(2 downto 0) := "000";
-	constant aDE	: std_logic_vector(2 downto 0) := "001";
-	constant aXY	: std_logic_vector(2 downto 0) := "010";
-	constant aIOA	: std_logic_vector(2 downto 0) := "100";
-	constant aSP	: std_logic_vector(2 downto 0) := "101";
-	constant aZI	: std_logic_vector(2 downto 0) := "110";
---	constant aNone	: std_logic_vector(2 downto 0) := "000";
---	constant aXY	: std_logic_vector(2 downto 0) := "001";
---	constant aIOA	: std_logic_vector(2 downto 0) := "010";
---	constant aSP	: std_logic_vector(2 downto 0) := "011";
---	constant aBC	: std_logic_vector(2 downto 0) := "100";
---	constant aDE	: std_logic_vector(2 downto 0) := "101";
---	constant aZI	: std_logic_vector(2 downto 0) := "110";
+	constant aNone      : std_logic_vector(2 downto 0) := "111";
+	constant aBC        : std_logic_vector(2 downto 0) := "000";
+	constant aDE        : std_logic_vector(2 downto 0) := "001";
+	constant aXY        : std_logic_vector(2 downto 0) := "010";
+	constant aIOA       : std_logic_vector(2 downto 0) := "100";
+	constant aSP        : std_logic_vector(2 downto 0) := "101";
+	constant aZI        : std_logic_vector(2 downto 0) := "110";
 
 	function is_cc_true(
 		F : std_logic_vector(7 downto 0);
@@ -161,10 +155,10 @@ architecture rtl of T80_MCode is
 	begin
 		if Mode = 3 then
 			case cc is
-			when "000" => return F(7) = '0'; -- NZ
-			when "001" => return F(7) = '1'; -- Z
-			when "010" => return F(4) = '0'; -- NC
-			when "011" => return F(4) = '1'; -- C
+			when "000" => return F(Flag_S) = '0'; -- NZ
+			when "001" => return F(Flag_S) = '1'; -- Z
+			when "010" => return F(Flag_H) = '0'; -- NC
+			when "011" => return F(Flag_H) = '1'; -- C
 			when "100" => return false;
 			when "101" => return false;
 			when "110" => return false;
@@ -172,21 +166,21 @@ architecture rtl of T80_MCode is
 			end case;
 		else
 			case cc is
-			when "000" => return F(6) = '0'; -- NZ
-			when "001" => return F(6) = '1'; -- Z
-			when "010" => return F(0) = '0'; -- NC
-			when "011" => return F(0) = '1'; -- C
-			when "100" => return F(2) = '0'; -- PO
-			when "101" => return F(2) = '1'; -- PE
-			when "110" => return F(7) = '0'; -- P
-			when "111" => return F(7) = '1'; -- M
+			when "000" => return F(Flag_Z) = '0'; -- NZ
+			when "001" => return F(Flag_Z) = '1'; -- Z
+			when "010" => return F(Flag_C) = '0'; -- NC
+			when "011" => return F(Flag_C) = '1'; -- C
+			when "100" => return F(Flag_P) = '0'; -- PO
+			when "101" => return F(Flag_P) = '1'; -- PE
+			when "110" => return F(Flag_S) = '0'; -- P
+			when "111" => return F(Flag_S) = '1'; -- M
 			end case;
 		end if;
 	end;
 
 begin
 
-	process (IR, ISet, MCycle, F, NMICycle, IntCycle)
+	process (IR, ISet, MCycle, F, NMICycle, IntCycle, XY_State)
 		variable DDD : std_logic_vector(2 downto 0);
 		variable SSS : std_logic_vector(2 downto 0);
 		variable DPair : std_logic_vector(1 downto 0);
@@ -1364,7 +1358,7 @@ begin
 				-- SRL r
 				-- SLL r (Undocumented) / SWAP r
 				if XY_State="00" then
-					if MCycle = "001" or MCycle = "111" then
+					if MCycle = "001" then
 					  ALU_Op <= "1000";
 					  Read_To_Reg <= '1';
 					  Save_ALU <= '1';
@@ -1421,7 +1415,7 @@ begin
 				|"01111000"|"01111001"|"01111010"|"01111011"|"01111100"|"01111101"|"01111111" =>
 				-- BIT b,r
 				if XY_State="00" then
-					if MCycle = "001" or MCycle = "111" then
+					if MCycle = "001" then
 					  Set_BusB_To(2 downto 0) <= IR(2 downto 0);
 					  ALU_Op <= "1001";
 					end if;
@@ -1464,24 +1458,6 @@ begin
 						ALU_Op <= "1010";
 						Read_To_Reg <= '1';
 						Save_ALU <= '1';
-					else
-						MCycles <= "100";
-						case to_integer(unsigned(MCycle)) is
-						when 7 =>
-							Set_Addr_To <= aXY;
-						when 2 =>
-							Set_BusB_To(2 downto 0) <= "110";
-							ALU_Op <= "1010";
-							Read_To_Reg <= '1';
-							Save_ALU <= '1';
-							Set_Addr_To <= aXY;
-							TStates <= "100";
-						when 3 =>
-							Set_Addr_To <= aXY;
-						when 4 =>
-							Write <= '1';
-						when others => null;
-						end case;
 					end if;
 				else
 				-- SET b,(IX+d),Reg, undocumented
@@ -1532,24 +1508,6 @@ begin
 						ALU_Op <= "1011";
 						Read_To_Reg <= '1';
 						Save_ALU <= '1';
-					else
-						MCycles <= "100";
-						case to_integer(unsigned(MCycle)) is
-						when 7 =>
-							Set_Addr_To <= aXY;
-						when 2 =>
-							Set_BusB_To(2 downto 0) <= "110";
-							ALU_Op <= "1011";
-							Read_To_Reg <= '1';
-							Save_ALU <= '1';
-							Set_Addr_To <= aXY;
-							TStates <= "100";
-						when 3 =>
-							Set_Addr_To <= aXY;
-						when 4 =>
-							Write <= '1';
-						when others => null;
-						end case;
 					end if;
 				else
 				-- RES b,(IX+d),Reg, undocumented
