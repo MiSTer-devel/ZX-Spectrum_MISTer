@@ -358,6 +358,7 @@ set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name QIP_FILE t80/T80.qip
 set_global_assignment -name QIP_FILE jt12/jt12.qip
+set_global_assignment -name SDC_FILE zxspectrum.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE saa1099.sv
 set_global_assignment -name SYSTEMVERILOG_FILE turbosound.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ym2149.sv

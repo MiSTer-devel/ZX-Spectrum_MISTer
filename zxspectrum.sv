@@ -138,7 +138,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.87.",`BUILD_DATE
+	"V,v3.88.",`BUILD_DATE
 };
 
 
@@ -168,10 +168,10 @@ reg  pause;
 reg  cpu_en = 1;
 reg  ce_cpu_tp;
 reg  ce_cpu_tn;
+reg  ce_tape, ce_tsound, ce_wd1793, ce_u765;
 
 wire ce_cpu_p = cpu_en & cpu_p;
 wire ce_cpu_n = cpu_en & cpu_n;
-wire ce_cpu   = cpu_en & ce_cpu_tp;
 
 wire cpu_p = ~&turbo ? ce_cpu_tp : ce_cpu_sp;
 wire cpu_n = ~&turbo ? ce_cpu_tn : ce_cpu_sn;
@@ -186,7 +186,13 @@ always @(negedge clk_sys) begin
 	ce_7mn  <=  counter[3] & !counter[2:0];
 	ce_ym   <= !counter[3:0] & ~pause;
 
+	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
+	ce_tape   <= !(counter & turbo) & cpu_en;
+	ce_tsound <= !(counter & turbo) & cpu_en;
+	ce_wd1793 <= !(counter & turbo) & cpu_en;
+	ce_u765   <= !(counter & turbo) & cpu_en;
+
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
 end
 
@@ -372,7 +378,7 @@ always_comb begin
 	endcase
 end
 
-reg init_reset = 1;
+(* maxfan = 5 *) reg init_reset = 1;
 always @(posedge clk_sys) begin
 	reg old_rst = 0;
 	old_rst <= status[0];
@@ -476,10 +482,10 @@ dpram #(.ADDRWIDTH(18), .NUMWORDS(180224), .MEM_INIT_FILE("bios.mif")) rom
 	 .wren_b(0)
 );
 
-reg        zx48;
-reg        p1024;
-reg        pf1024;
-reg        plus3;
+(* maxfan = 10 *) reg	zx48;
+(* maxfan = 10 *) reg	p1024;
+(* maxfan = 10 *) reg	pf1024;
+(* maxfan = 10 *) reg	plus3;
 reg        page_scr_copy;
 reg        shadow_rom;
 reg  [7:0] page_reg;
@@ -590,7 +596,7 @@ turbosound turbosound
 (
 	.RESET(aud_reset),
 	.CLK(clk_sys),
-	.CE_CPU(ce_cpu),
+	.CE_CPU(ce_tsound),
 	.CE_YM(ce_ym),
 	.BDIR(psg_we),
 	.BC(addr[14]),
@@ -613,7 +619,7 @@ end
 wire [7:0] saa_ch_l;
 wire [7:0] saa_ch_r;
 
-saa1099 psg
+saa1099 saa1099
 (
 	.clk_sys(clk_sys),
 	.ce(ce_saa),
@@ -637,8 +643,8 @@ compressor compressor
 );
 
 ////////////////////   VIDEO   ///////////////////
-wire        ce_cpu_sn;
-wire        ce_cpu_sp;
+(* maxfan = 10 *) wire        ce_cpu_sn;
+(* maxfan = 10 *) wire        ce_cpu_sp;
 wire [14:0] vram_addr;
 wire  [7:0] vram_dout;
 wire  [7:0] port_ff;
@@ -811,7 +817,7 @@ end
 wd1793 #(1) fdd
 (
 	.clk_sys(clk_sys),
-	.ce(ce_cpu),
+	.ce(ce_wd1793),
 	.reset((fdd_reset & ~plusd_en) | reset),
 	.io_en((fdd_sel2 | (fdd_sel & ~addr[7])) & ~nIORQ & nM1),
 	.rd(~nRD),
@@ -851,6 +857,7 @@ wd1793 #(1) fdd
 u765 u765
 (
 	.clk_sys(clk_sys),
+	.ce(ce_u765),
 	.reset(reset),
 	.a0(addr[12]),
 	.ready(plus3_fdd_ready),
@@ -888,7 +895,7 @@ smart_tape tape
 (
 	.*,
 	.reset(reset & ~Fn[10]),
-	.ce(ce_cpu),
+	.ce(ce_tape),
 
 	.turbo(tape_turbo),
 	.pause(Fn[1]),
