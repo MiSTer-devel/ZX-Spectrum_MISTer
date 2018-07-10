@@ -235,6 +235,7 @@ architecture rtl of T80 is
 	signal I_BTR                : std_logic;
 	signal I_RLD                : std_logic;
 	signal I_RRD                : std_logic;
+	signal I_RXDD               : std_logic;
 	signal I_INRC               : std_logic;
 	signal SetDI                : std_logic;
 	signal SetEI                : std_logic;
@@ -383,6 +384,7 @@ begin
 			Save_ALU_r <= '0';
 			PreserveC_r <= '0';
 			XY_Ind <= '0';
+			I_RXDD <= '0';
 
 		elsif rising_edge(CLK_n) then
 
@@ -654,7 +656,11 @@ begin
 			end if;
 
 			if TState = 1 and Auto_Wait_t1 = '0' then
-				DO <= BusB;
+				-- Keep D0 from M3 for RLD/RRD (Sorgelig)
+				I_RXDD <= I_RLD or I_RRD;
+				if I_RXDD='0' then
+					DO <= BusB;
+				end if;
 				if I_RLD = '1' then
 					DO(3 downto 0) <= BusA(3 downto 0);
 					DO(7 downto 4) <= BusB(3 downto 0);
@@ -904,7 +910,7 @@ begin
 			when "1010" =>
 				BusA <= "00000000";
 			when others =>
-				BusB <= "--------";
+				BusA <= "--------";
 			end case;
 			if XYbit_undoc='1' then
 				BusA <= DI_Reg;

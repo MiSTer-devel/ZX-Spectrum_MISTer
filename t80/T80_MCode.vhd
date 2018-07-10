@@ -1808,41 +1808,44 @@ begin
 				when others =>
 				end case;
 			when "01101111" =>
-				-- RLD
+				-- RLD -- Read in M2, not M3! fixed by Sorgelig
 				MCycles <= "100";
 				case to_integer(unsigned(MCycle)) is
-				when 2 =>
-					NoRead <= '1';
+				when 1 =>
 					Set_Addr_To <= aXY;
-				when 3 =>
+				when 2 =>
 					Read_To_Reg <= '1';
 					Set_BusB_To(2 downto 0) <= "110";
 					Set_BusA_To(2 downto 0) <= "111";
 					ALU_Op <= "1101";
-					TStates <= "100";
-					Set_Addr_To <= aXY;
 					Save_ALU <= '1';
-				when 4 =>
+				when 3 =>
+					TStates <= "100";
 					I_RLD <= '1';
+					NoRead <= '1';
+					Set_Addr_To <= aXY;
+				when 4 =>
 					Write <= '1';
 				when others =>
 				end case;
 			when "01100111" =>
-				-- RRD
+				-- RRD -- Read in M2, not M3! fixed by Sorgelig
 				MCycles <= "100";
 				case to_integer(unsigned(MCycle)) is
-				when 2 =>
+				when 1 =>
 					Set_Addr_To <= aXY;
-				when 3 =>
+				when 2 =>
 					Read_To_Reg <= '1';
 					Set_BusB_To(2 downto 0) <= "110";
 					Set_BusA_To(2 downto 0) <= "111";
 					ALU_Op <= "1110";
-					TStates <= "100";
-					Set_Addr_To <= aXY;
 					Save_ALU <= '1';
-				when 4 =>
+				when 3 =>
+					TStates <= "100";
 					I_RRD <= '1';
+					NoRead <= '1';
+					Set_Addr_To <= aXY;
+				when 4 =>
 					Write <= '1';
 				when others =>
 				end case;

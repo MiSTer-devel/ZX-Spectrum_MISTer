@@ -45,6 +45,7 @@
 -- v2.0: rewritten for more precise timings.
 --       support for both CEN_n and CEN_p set to 1. Effective clock will be CLK/2.
 --
+-- v2.1: Output Address 0 during non-bus MCycle (fix ZX contention)
 --
 
 library IEEE;
@@ -92,8 +93,11 @@ architecture rtl of T80pa is
 	signal MCycle			: std_logic_vector(2 downto 0);
 	signal TState			: std_logic_vector(2 downto 0);
 	signal CEN_pol			: std_logic;
+	signal A_int		   : std_logic_vector(15 downto 0);
 
 begin
+
+	A <= A_int when NoRead = '0' or Write = '1' else (others => '0');
 
 	BUSAK_n <= BUSAK;
 
@@ -117,7 +121,7 @@ begin
 			BUSRQ_n => BUSRQ_n,
 			BUSAK_n => BUSAK,
 			CLK_n   => CLK,
-			A       => A,
+			A       => A_int,
 			DInst   => DI,     -- valid   at beginning of T3
 			DI      => DI_Reg, -- latched at middle    of T3
 			DO      => DO,
