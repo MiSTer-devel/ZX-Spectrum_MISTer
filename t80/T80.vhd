@@ -542,7 +542,7 @@ begin
 						-- CCF
 						F(Flag_C) <= not F(Flag_C);
 						F(Flag_Y) <= ACC(5);
-						F(Flag_H) <= not F(Flag_H); --freemac F(Flag_C);
+						F(Flag_H) <= F(Flag_C);
 						F(Flag_X) <= ACC(3);
 						F(Flag_N) <= '0';
 					end if;
@@ -614,9 +614,36 @@ begin
 					when "00" =>
 						ACC <= I;
 						F(Flag_P) <= IntE_FF2;
+						F(Flag_S) <= I(7);
+						
+						if I = x"00" then 
+							F(Flag_Z) <= '1';
+						else
+							F(Flag_Z) <= '0';
+						end if;
+
+						F(Flag_Y) <= I(5);
+						F(Flag_H) <= '0';
+						F(Flag_X) <= I(3);
+						F(Flag_N) <= '0';
+
+
 					when "01" =>
 						ACC <= std_logic_vector(R);
 						F(Flag_P) <= IntE_FF2;
+						F(Flag_S) <= R(7);
+						
+						if R = x"00" then 
+							F(Flag_Z) <= '1';
+						else
+							F(Flag_Z) <= '0';
+						end if;
+						
+						F(Flag_Y) <= R(5);
+						F(Flag_H) <= '0';
+						F(Flag_X) <= R(3);
+						F(Flag_N) <= '0';
+
 					when "10" =>
 						I <= ACC;
 					when others =>
@@ -1055,12 +1082,10 @@ begin
 								if NMI_s = '1' and Prefix = "00" then
 									NMICycle <= '1';
 									IntE_FF1 <= '0';
-								elsif INT_n='0' and Prefix = "00" then
-									if IntE_FF1 = '1' and SetEI = '0' then
-										IntE_FF1 <= '0';
-										IntE_FF2 <= '0';
-										IntCycle <= '1';
-									end if;
+								elsif IntE_FF1 = '1' and INT_n='0' and Prefix = "00" and SetEI = '0' then
+									IntCycle <= '1';
+									IntE_FF1 <= '0';
+									IntE_FF2 <= '0';
 								end if;
 							else
 								MCycle <= std_logic_vector(unsigned(MCycle) + 1);
