@@ -143,8 +143,8 @@ always @(posedge clk_sys) begin
 			if(wide) VBlank <= !(vc < (193) || vc >= (!mZX ? 319-4 : m128 ? 310-4 : 311-4));
 		end
 
-		if( mZX && (vc == 248) && (hc == (m128 ? 6 : 2))) INT <= 1;
-		if(!mZX && (vc == 239) && (hc == 324)) INT <= 1;
+		if( mZX && (vc == 248) && (hc == (m128 ? 8 : 4))) INT <= 1;
+		if(!mZX && (vc == 239) && (hc == 326)) INT <= 1;
 
 		if(INT)  INTCnt <= INTCnt + 1'd1;
 		if(!INTCnt) INT <= 0;

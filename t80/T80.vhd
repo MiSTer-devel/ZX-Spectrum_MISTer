@@ -82,8 +82,7 @@ entity T80 is
 		Flag_H : integer := 4;
 		Flag_Y : integer := 5;
 		Flag_Z : integer := 6;
-		Flag_S : integer := 7;
-		USE_FALLING_EDGE_INTN : boolean:=false
+		Flag_S : integer := 7
 	);
 	port(
 		RESET_n         : in  std_logic;
@@ -162,7 +161,6 @@ architecture rtl of T80 is
 	signal BusAck               : std_logic;
 	signal ClkEn                : std_logic;
 	signal NMI_s                : std_logic;
-	signal INT_s                : std_logic;
 	signal IStatus              : std_logic_vector(1 downto 0);
 
 	signal DI_Reg               : std_logic_vector(7 downto 0);
@@ -960,19 +958,17 @@ begin
 	begin
 		if RESET_n = '0' then
 			BusReq_s <= '0';
-			INT_s <= '0';
 			NMI_s <= '0';
 			OldNMI_n := '0';
 		elsif rising_edge(CLK_n) then
 			if CEN = '1' then
-			BusReq_s <= not BUSRQ_n;
-			INT_s <= not INT_n;
-			if NMICycle = '1' then
-				NMI_s <= '0';
-			elsif NMI_n = '0' and OldNMI_n = '1' then
-				NMI_s <= '1';
-			end if;
-			OldNMI_n := NMI_n;
+				BusReq_s <= not BUSRQ_n;
+				if NMICycle = '1' then
+					NMI_s <= '0';
+				elsif NMI_n = '0' and OldNMI_n = '1' then
+					NMI_s <= '1';
+				end if;
+				OldNMI_n := NMI_n;
 			end if;
 		end if;
 	end process;
@@ -983,9 +979,6 @@ begin
 --
 -------------------------------------------------------------------------
 	process (RESET_n, CLK_n)
-		variable wasINT_s_0:boolean:=false;
-		variable just_rising_INT_s:boolean:=false;
-		variable thats_rock:boolean:=false;
 	begin
 		if RESET_n = '0' then
 			MCycle <= "001";
@@ -1002,111 +995,87 @@ begin
 			Auto_Wait_t2 <= '0';
 			M1_n <= '1';
 		elsif rising_edge(CLK_n) then
-		
-			if INT_s = '1' and wasINT_s_0 then
-				just_rising_INT_s:=true;
-			end if;
-			if INT_s = '0' then
-				wasINT_s_0:=true;
-			else
-				wasINT_s_0:=false;
-			end if;
+			
 			if CEN = '1' then
-			if T_Res = '1' then
-				Auto_Wait_t1 <= '0';
-			else
-				Auto_Wait_t1 <= Auto_Wait or IORQ_i;
-			end if;
-			Auto_Wait_t2 <= Auto_Wait_t1;
-			No_BTR <= (I_BT and (not IR(4) or not F(Flag_P))) or
-					(I_BC and (not IR(4) or F(Flag_Z) or not F(Flag_P))) or
-					(I_BTR and (not IR(4) or F(Flag_Z)));
-			if TState = 2 then
-				if SetEI = '1' then
-					IntE_FF1 <= '1';
-					IntE_FF2 <= '1';
+				if T_Res = '1' then
+					Auto_Wait_t1 <= '0';
+				else
+					Auto_Wait_t1 <= Auto_Wait or IORQ_i;
 				end if;
-				if I_RETN = '1' then
-					IntE_FF1 <= IntE_FF2;
-				end if;
-			end if;
-			if TState = 3 then
-				if SetDI = '1' then
-					IntE_FF1 <= '0';
-					IntE_FF2 <= '0';
-				end if;
-			end if;
-			if IntCycle = '1' or NMICycle = '1' then
-				Halt_FF <= '0';
-			end if;
-			if MCycle = "001" and TState = 2 and Wait_n = '1' then
-				M1_n <= '1';
-			end if;
-			if BusReq_s = '1' and BusAck = '1' then
-			else
-				BusAck <= '0';
-				if TState = 2 and Wait_n = '0' then
-				elsif T_Res = '1' then
-					if Halt = '1' then
-						Halt_FF <= '1';
+				Auto_Wait_t2 <= Auto_Wait_t1;
+				No_BTR <= (I_BT and (not IR(4) or not F(Flag_P))) or
+						(I_BC and (not IR(4) or F(Flag_Z) or not F(Flag_P))) or
+						(I_BTR and (not IR(4) or F(Flag_Z)));
+				if TState = 2 then
+					if SetEI = '1' then
+						IntE_FF1 <= '1';
+						IntE_FF2 <= '1';
 					end if;
-					if BusReq_s = '1' then
-						BusAck <= '1';
-					else
-						TState <= "001";
-						if NextIs_XY_Fetch = '1' then
-							MCycle <= "110";
-							Pre_XY_F_M <= MCycle;
-							if IR = "00110110" and Mode = 0 then
-								Pre_XY_F_M <= "010";
-							end if;
-						elsif (MCycle = "111") or
-							(MCycle = "110" and Mode = 1 and ISet /= "01") then
-							MCycle <= std_logic_vector(unsigned(Pre_XY_F_M) + 1);
-						elsif (MCycle = MCycles) or
-							No_BTR = '1' or
-							(MCycle = "010" and I_DJNZ = '1' and IncDecZ = '1') then
-							M1_n <= '0';
-							MCycle <= "001";
-							if not(thats_rock) then
-								IntCycle <= '0';
-							end if;
-							NMICycle <= '0';
-							if NMI_s = '1' and Prefix = "00" then
-								NMICycle <= '1';
-								IntE_FF1 <= '0';
-							elsif (IntE_FF1 = '1' and ((USE_FALLING_EDGE_INTN and just_rising_INT_s) or (not(USE_FALLING_EDGE_INTN) and INT_s='1') )) and Prefix = "00" and SetEI = '0' then
-								if USE_FALLING_EDGE_INTN then
-									thats_rock:=true;
-								else
-									IntE_FF1 <= '0';
-									IntE_FF2 <= '0';
-								end if;
-								IntCycle <= '1';
-								
-							end if;
-						elsif MCycle="010" then
-							if thats_rock then
-								thats_rock:=false;
-								just_rising_INT_s:=false;
-								IntE_FF1 <= '0';
-								IntE_FF2 <= '0';
-							end if;
-							MCycle <= std_logic_vector(unsigned(MCycle) + 1);
+					if I_RETN = '1' then
+						IntE_FF1 <= IntE_FF2;
+					end if;
+				end if;
+				if TState = 3 then
+					if SetDI = '1' then
+						IntE_FF1 <= '0';
+						IntE_FF2 <= '0';
+					end if;
+				end if;
+				if IntCycle = '1' or NMICycle = '1' then
+					Halt_FF <= '0';
+				end if;
+				if MCycle = "001" and TState = 2 and Wait_n = '1' then
+					M1_n <= '1';
+				end if;
+				if BusReq_s = '1' and BusAck = '1' then
+				else
+					BusAck <= '0';
+					if TState = 2 and Wait_n = '0' then
+					elsif T_Res = '1' then
+						if Halt = '1' then
+							Halt_FF <= '1';
+						end if;
+						if BusReq_s = '1' then
+							BusAck <= '1';
 						else
-							MCycle <= std_logic_vector(unsigned(MCycle) + 1);
+							TState <= "001";
+							if NextIs_XY_Fetch = '1' then
+								MCycle <= "110";
+								Pre_XY_F_M <= MCycle;
+								if IR = "00110110" and Mode = 0 then
+									Pre_XY_F_M <= "010";
+								end if;
+							elsif (MCycle = "111") or (MCycle = "110" and Mode = 1 and ISet /= "01") then
+								MCycle <= std_logic_vector(unsigned(Pre_XY_F_M) + 1);
+							elsif (MCycle = MCycles) or No_BTR = '1' or (MCycle = "010" and I_DJNZ = '1' and IncDecZ = '1') then
+								M1_n <= '0';
+								MCycle <= "001";
+								IntCycle <= '0';
+								NMICycle <= '0';
+								if NMI_s = '1' and Prefix = "00" then
+									NMICycle <= '1';
+									IntE_FF1 <= '0';
+								elsif INT_n='0' and Prefix = "00" then
+									if IntE_FF1 = '1' and SetEI = '0' then
+										IntE_FF1 <= '0';
+										IntE_FF2 <= '0';
+										IntCycle <= '1';
+									end if;
+								end if;
+							else
+								MCycle <= std_logic_vector(unsigned(MCycle) + 1);
+							end if;
+						end if;
+					else
+						if (Auto_Wait = '1' and Auto_Wait_t2 = '0') nor
+							(IOWait = 1 and IORQ_i = '1' and Auto_Wait_t1 = '0') then
+							TState <= TState + 1;
 						end if;
 					end if;
-				else
-					if (Auto_Wait = '1' and Auto_Wait_t2 = '0') nor
-						(IOWait = 1 and IORQ_i = '1' and Auto_Wait_t1 = '0') then
-						TState <= TState + 1;
-					end if;
 				end if;
-			end if;
-			if TState = 0 then
-				M1_n <= '0';
-			end if;
+				if TState = 0 then
+					M1_n <= '0';
+				end if;
 			end if;
 		end if;
 	end process;

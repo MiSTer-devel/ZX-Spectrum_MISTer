@@ -1849,8 +1849,25 @@ begin
 					Write <= '1';
 				when others =>
 				end case;
-			when "01000101"|"01001101"|"01010101"|"01011101"|"01100101"|"01101101"|"01110101"|"01111101" =>
-				-- RETI, RETN
+			when "01001101" =>
+				-- RETI
+				MCycles <= "011";
+				case to_integer(unsigned(MCycle)) is
+				when 1 =>
+					--TStates <= "101";
+					Set_Addr_TO <= aSP;
+				when 2 =>
+					IncDec_16 <= "0111";
+					Set_Addr_To <= aSP;
+					LDZ <= '1';
+				when 3 =>
+					Jump <= '1';
+					IncDec_16 <= "0111";
+				when others => null;
+				end case;
+				
+			when "01000101"|"01010101"|"01011101"|"01100101"|"01101101"|"01110101"|"01111101" =>
+				-- RETN
 				MCycles <= "011";
 				case to_integer(unsigned(MCycle)) is
 				when 1 =>
