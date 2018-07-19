@@ -861,8 +861,8 @@ u765 u765
 	.reset(reset),
 	.a0(addr[12]),
 	.ready(plus3_fdd_ready),
-	.nRD(plus3_fdd & ~nIORQ & nM1 & nRD),
-	.nWR(plus3_fdd & ~nIORQ & nM1 & nWR),
+	.nRD(~plus3_fdd | nIORQ | ~nM1 | nRD),
+	.nWR(~plus3_fdd | nIORQ | ~nM1 | nWR),
 	.din(cpu_dout),
 	.dout(u765_dout),
 

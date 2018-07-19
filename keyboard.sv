@@ -68,7 +68,7 @@ assign key_data = (!addr[8]  ? keys[0] : 5'b11111)
 reg  input_strobe = 0;
 wire shift = mod[0];
 
-always @(negedge clk_sys) begin
+always @(posedge clk_sys) begin
 	reg old_reset = 0;
 	old_reset <= reset;
 
