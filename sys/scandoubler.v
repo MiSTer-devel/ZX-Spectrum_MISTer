@@ -57,7 +57,7 @@ assign ce_pix_out = ce_x4;
 
 //Compensate picture shift after HQ2x
 assign vb_out = vbo[2];
-assign hb_out = &hbo[5:4];
+assign hb_out = hq2x ? hbo[4] : hbo[2];
 
 reg  [7:0] pix_len = 0;
 wire [7:0] pl = pix_len + 1'b1;
@@ -104,14 +104,13 @@ Hq2x #(.LENGTH(LENGTH), .HALF_DEPTH(HALF_DEPTH)) Hq2x
 	.reset_frame(vs_in),
 	.reset_line(req_line_reset),
 	.read_y(sd_line),
-	.read_x(sd_h),
+	.hblank(hbo[0]),
 	.outpixel({b_out,g_out,r_out})
 );
 
-reg [10:0] sd_h;
 reg  [1:0] sd_line;
 reg  [2:0] vbo;
-reg  [5:0] hbo;
+reg  [4:0] hbo;
 
 reg [DWIDTH:0] r_d;
 reg [DWIDTH:0] g_d;
@@ -160,11 +159,10 @@ always @(posedge clk_sys) begin
 
 	if(ce_x4) begin
 		hs2 <= hs_in;
-		hbo[5:1] <= hbo[4:0];
+		hbo[4:1] <= hbo[3:0];
 
 		// output counter synchronous to input and at twice the rate
 		sd_hcnt <= sd_hcnt + 1'd1;
-		if(~&hbo) sd_h <= sd_h + 1'd1;
 
 		if(hs2 && !hs_in)     sd_hcnt <= hs_max;
 		if(sd_hcnt == hs_max) sd_hcnt <= 0;
@@ -172,7 +170,6 @@ always @(posedge clk_sys) begin
 
 		//prepare to read in advance
 		if(sd_hcnt == (hde_start-2)) begin
-			sd_h    <= 0;
 			sd_line <= sd_line + 1'd1;
 		end
 
