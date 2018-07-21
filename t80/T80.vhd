@@ -69,6 +69,7 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
+use IEEE.STD_LOGIC_UNSIGNED.all;
 use work.T80_Pack.all;
 
 entity T80 is
@@ -352,6 +353,7 @@ begin
 		ALU_Q;
 
 	process (RESET_n, CLK_n)
+		variable n : std_logic_vector(7 downto 0);
 	begin
 		if RESET_n = '0' then
 			PC <= (others => '0');  -- Program Counter
@@ -710,6 +712,11 @@ begin
 				F(Flag_Y) <= ALU_Q(1);
 				F(Flag_H) <= '0';
 				F(Flag_N) <= '0';
+			end if;
+			if TState = 1 and I_BC = '1' then
+				n := ALU_Q - ("0000000" & F_Out(Flag_H));
+				F(Flag_X) <= n(3);
+				F(Flag_Y) <= n(1);
 			end if;
 			if I_BC = '1' or I_BT = '1' then
 				F(Flag_P) <= IncDecZ;
