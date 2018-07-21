@@ -1024,12 +1024,13 @@ begin
 		elsif rising_edge(CLK_n) then
 			
 			if CEN = '1' then
+				Auto_Wait_t2 <= Auto_Wait_t1;
 				if T_Res = '1' then
 					Auto_Wait_t1 <= '0';
+					Auto_Wait_t2 <= '0';
 				else
 					Auto_Wait_t1 <= Auto_Wait or IORQ_i;
 				end if;
-				Auto_Wait_t2 <= Auto_Wait_t1;
 				No_BTR <= (I_BT and (not IR(4) or not F(Flag_P))) or
 						(I_BC and (not IR(4) or F(Flag_Z) or not F(Flag_P))) or
 						(I_BTR and (not IR(4) or F(Flag_Z)));
