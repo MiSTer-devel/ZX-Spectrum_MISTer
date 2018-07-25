@@ -53,7 +53,7 @@ module scandoubler #(parameter LENGTH, parameter HALF_DEPTH)
 localparam DWIDTH = HALF_DEPTH ? 3 : 7;
 
 assign vs_out = vso[3];
-assign ce_pix_out = ce_x4;
+assign ce_pix_out = hq2x ? ce_x4 : ce_x2;
 
 //Compensate picture shift after HQ2x
 assign vb_out = vbo[2];
@@ -62,7 +62,7 @@ assign hb_out = hq2x ? hbo[4] : hbo[2];
 reg  [7:0] pix_len = 0;
 wire [7:0] pl = pix_len + 1'b1;
 
-reg ce_x1, ce_x4;
+reg ce_x1, ce_x4, ce_x2;
 reg req_line_reset;
 always @(negedge clk_sys) begin
 	reg old_ce;
@@ -74,6 +74,7 @@ always @(negedge clk_sys) begin
 	if(~&pix_len) pix_len <= pix_len + 1'd1;
 
 	ce_x4 <= 0;
+	ce_x2 <= 0;
 	ce_x1 <= 0;
 
 	// use such odd comparison to place ce_x4 evenly if master clock isn't multiple 4.
@@ -81,10 +82,15 @@ always @(negedge clk_sys) begin
 		ce_x4 <= 1;
 	end
 
+	if(pl == pixsz2) begin
+		ce_x2 <= 1;
+	end
+
 	if(~old_ce & ce_pix) begin
 		pixsz2 <= {1'b0,  pl[7:1]};
 		pixsz4 <= {2'b00, pl[7:2]};
 		ce_x1 <= 1;
+		ce_x2 <= 1;
 		ce_x4 <= 1;
 		pix_len <= 0;
 		req_line_reset <= 0;
@@ -93,7 +99,6 @@ always @(negedge clk_sys) begin
 	end
 end
 
-localparam AWIDTH = `BITS_TO_FIT(LENGTH);
 Hq2x #(.LENGTH(LENGTH), .HALF_DEPTH(HALF_DEPTH)) Hq2x
 (
 	.clk(clk_sys),

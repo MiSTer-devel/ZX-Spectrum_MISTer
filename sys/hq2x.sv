@@ -12,19 +12,6 @@
 `timescale 1 ps / 1 ps
 // synopsys translate_on
 
-`define BITS_TO_FIT(N) ( \
-     N <=    2 ? 0 : \
-     N <=    4 ? 1 : \
-     N <=    8 ? 2 : \
-     N <=   16 ? 3 : \
-     N <=   32 ? 4 : \
-     N <=   64 ? 5 : \
-     N <=  128 ? 6 : \
-     N <=  256 ? 7 : \
-     N <=  512 ? 8 : \
-     N <= 1024 ? 9 : \
-     N <= 2048 ?10 : 11 )
-
 module Hq2x #(parameter LENGTH, parameter HALF_DEPTH)
 (
 	input             clk,
@@ -40,7 +27,7 @@ module Hq2x #(parameter LENGTH, parameter HALF_DEPTH)
 );
 
 
-localparam AWIDTH = `BITS_TO_FIT(LENGTH);
+localparam AWIDTH = $clog2(LENGTH)-1;
 localparam DWIDTH = HALF_DEPTH ? 11 : 23;
 localparam DWIDTH1 = DWIDTH+1;
 
@@ -79,8 +66,8 @@ DiffCheck diffcheck1(Curr1, (cyc == 0) ? Prev1 : (cyc == 1) ? Next0 : (cyc == 2)
 wire [7:0] new_pattern = {diff1, diff0, pattern[7:2]};
 
 wire [23:0] X = (cyc == 0) ? A : (cyc == 1) ? Prev1 : (cyc == 2) ? Next1 : G;
-wire [23:0] blend_result;
-Blend blender(hqTable[nextpatt], disable_hq2x, Curr0, X, B, D, F, H, blend_result);
+wire [23:0] blend_result_pre;
+Blend blender(hqTable[nextpatt], disable_hq2x, Curr0, X, B, D, F, H, blend_result_pre);
 
 wire [DWIDTH:0] Curr20tmp;
 wire     [23:0] Curr20 = HALF_DEPTH ? h2rgb(Curr20tmp) : Curr20tmp;
@@ -142,11 +129,12 @@ hq2x_buf #(.NUMWORDS(LENGTH*2), .AWIDTH(AWIDTH+1), .DWIDTH(DWIDTH1*4-1)) hq2x_ou
 	.wren(wrout_en)
 );
 
+wire [DWIDTH:0] blend_result = HALF_DEPTH ? rgb2h(blend_result_pre) : blend_result_pre;
+
 reg [AWIDTH:0] offs;
 always @(posedge clk) begin
 	reg old_reset_line;
 	reg old_reset_frame;
-	reg [DWIDTH:0] tmp;
 
 	wrout_en <= 0;
 	wrin_en  <= 0;
@@ -166,18 +154,14 @@ always @(posedge clk) begin
 				wrin_en <= 1;
 			end
 
-			if(HALF_DEPTH) tmp = rgb2h(blend_result);
-			else           tmp = blend_result;
-
 			case({cyc[1],^cyc})
-				0: wrdata_pre[DWIDTH:0]                   = tmp;
-				1: wrdata_pre[DWIDTH1+DWIDTH:DWIDTH1]     = tmp;
-				2: wrdata_pre[DWIDTH1*2+DWIDTH:DWIDTH1*2] = tmp;
-				3: wrdata_pre[DWIDTH1*3+DWIDTH:DWIDTH1*3] = tmp;
+				0: wrdata[DWIDTH:0]                   <= blend_result;
+				1: wrdata[DWIDTH1+DWIDTH:DWIDTH1]     <= blend_result;
+				2: wrdata[DWIDTH1*2+DWIDTH:DWIDTH1*2] <= blend_result;
+				3: wrdata[DWIDTH1*3+DWIDTH:DWIDTH1*3] <= blend_result;
 			endcase
 
 			if(cyc==3) begin
-				wrdata <= wrdata_pre;
 				offs <= offs + 1'd1;
 				wrout_addr <= {offs, curbuf};
 				wrout_en <= 1;
@@ -235,7 +219,7 @@ module hq2x_in #(parameter LENGTH, parameter DWIDTH)
 	input            wren
 );
 
-	localparam AWIDTH = `BITS_TO_FIT(LENGTH);
+	localparam AWIDTH = $clog2(LENGTH)-1;
 	wire  [DWIDTH:0] out[2];
 	assign q0 = out[rdbuf0];
 	assign q1 = out[rdbuf1];
