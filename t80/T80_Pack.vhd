@@ -209,6 +209,8 @@ package T80_Pack is
 	port(
 		Arith16         : in  std_logic;
 		Z16             : in  std_logic;
+		WZ              : in  std_logic_vector(15 downto 0);
+		XY_State        : in  std_logic_vector(1 downto 0);
 		ALU_Op          : in  std_logic_vector(3 downto 0);
 		IR              : in  std_logic_vector(5 downto 0);
 		ISet            : in  std_logic_vector(1 downto 0);

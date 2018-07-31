@@ -330,6 +330,8 @@ begin
 		port map(
 			Arith16 => Arith16_r,
 			Z16     => Z16_r,
+			WZ      => TmpAddr,
+			XY_State=> XY_State,
 			ALU_Op  => ALU_Op_r,
 			IR      => IR(5 downto 0),
 			ISet    => ISet,
