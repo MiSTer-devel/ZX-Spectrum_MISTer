@@ -356,6 +356,7 @@ begin
 
 	process (RESET_n, CLK_n)
 		variable n : std_logic_vector(7 downto 0);
+		variable ioq : std_logic_vector(8 downto 0);
 	begin
 		if RESET_n = '0' then
 			PC <= (others => '0');  -- Program Counter
@@ -559,6 +560,15 @@ begin
 						F(Flag_N) <= '0';
 					end if;
 				end if;
+				
+				if (TState = 2 and I_BTR = '1' and IR(0) = '1') or (TState = 1 and I_BTR = '1' and IR(0) = '0') then
+					ioq := ('0' & DI_Reg) + ('0' & std_logic_vector(ID16(7 downto 0)));
+					F(Flag_N) <= DI_Reg(7);
+					F(Flag_C) <= ioq(8);
+					F(Flag_H) <= ioq(8);
+					ioq := (ioq and x"7") xor ('0'&BusA);
+					F(Flag_P) <= not (ioq(0) xor ioq(1) xor ioq(2) xor ioq(3) xor ioq(4) xor ioq(5) xor ioq(6) xor ioq(7));
+				end if;
 
 				if TState = 2 and Wait_n = '1' then
 					if ISet = "01" and MCycle = "111" then
@@ -674,6 +684,8 @@ begin
 			if T_Res = '1' and I_INRC = '1' then
 				F(Flag_H) <= '0';
 				F(Flag_N) <= '0';
+				F(Flag_X) <= DI_Reg(3);
+				F(Flag_Y) <= DI_Reg(5);
 				if DI_Reg(7 downto 0) = "00000000" then
 					F(Flag_Z) <= '1';
 				else
