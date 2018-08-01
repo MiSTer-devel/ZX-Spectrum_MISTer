@@ -4,7 +4,7 @@
 --
 -- Ver 303 add undocumented DDCB and FDCB opcodes by TobiFlex 20.04.2010
 -- Ver 301 parity flag is just parity for 8080, also overflow for Z80, by Sean Riddle
--- Ver 300 started tidyup. Rmoved some auto_wait bits from 0247 which caused problems
+-- Ver 300 started tidyup.
 --
 -- MikeJ March 2005
 -- Latest version from www.fpgaarcade.com (original www.opencores.org)
