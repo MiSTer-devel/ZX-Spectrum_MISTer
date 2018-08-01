@@ -938,7 +938,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign tape_in = tape_loaded_reg ? tape_vin : TAPE_IN;
+assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
 
 endmodule
 
