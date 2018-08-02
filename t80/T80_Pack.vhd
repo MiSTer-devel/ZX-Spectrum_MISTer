@@ -1,5 +1,14 @@
 --------------------------------------------------------------------------------
 -- ****
+-- T80(c) core. Attempt to finish all undocumented features and provide
+--              accurate timings.
+-- Version 350.
+-- Copyright (c) 2018 Sorgelig
+--  Test passed: ZEXDOC, ZEXALL, Z80Full(*), Z80memptr
+--  (*) Currently only SCF and CCF instructions aren't passed X/Y flags check as
+--      correct implementation is still unclear.
+--
+-- ****
 -- T80(b) core. In an effort to merge and maintain bug fixes ....
 --
 --
@@ -184,6 +193,7 @@ package T80_Pack is
 		I_RLD			: out std_logic;
 		I_RRD			: out std_logic;
 		I_INRC			: out std_logic;
+		SetWZ  		: out std_logic_vector(1 downto 0);
 		SetDI			: out std_logic;
 		SetEI			: out std_logic;
 		IMode			: out std_logic_vector(1 downto 0);

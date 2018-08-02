@@ -1,5 +1,14 @@
 --------------------------------------------------------------------------------
 -- ****
+-- T80(c) core. Attempt to finish all undocumented features and provide
+--              accurate timings.
+-- Version 350.
+-- Copyright (c) 2018 Sorgelig
+--  Test passed: ZEXDOC, ZEXALL, Z80Full(*), Z80memptr
+--  (*) Currently only SCF and CCF instructions aren't passed X/Y flags check as
+--      correct implementation is still unclear.
+--
+-- ****
 -- T80(b) core. In an effort to merge and maintain bug fixes ....
 --
 -- Ver 303 add undocumented DDCB and FDCB opcodes by TobiFlex 20.04.2010
@@ -86,30 +95,30 @@ entity T80 is
 		Flag_S : integer := 7
 	);
 	port(
-		RESET_n         : in  std_logic;
-		CLK_n           : in  std_logic;
-		CEN             : in  std_logic;
-		WAIT_n          : in  std_logic;
-		INT_n           : in  std_logic;
-		NMI_n           : in  std_logic;
-		BUSRQ_n         : in  std_logic;
-		M1_n            : out std_logic;
-		IORQ            : out std_logic;
-		NoRead          : out std_logic;
-		Write           : out std_logic;
-		RFSH_n          : out std_logic;
-		HALT_n          : out std_logic;
-		BUSAK_n         : out std_logic;
-		A               : out std_logic_vector(15 downto 0);
-		DInst           : in  std_logic_vector(7 downto 0);
-		DI              : in  std_logic_vector(7 downto 0);
-		DO              : out std_logic_vector(7 downto 0);
-		MC              : out std_logic_vector(2 downto 0);
-		TS              : out std_logic_vector(2 downto 0);
-		IntCycle_n      : out std_logic;
-		IntE            : out std_logic;
-		Stop            : out std_logic;
-		REG	            : out std_logic_vector(207 downto 0) -- IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		RESET_n    : in  std_logic;
+		CLK_n      : in  std_logic;
+		CEN        : in  std_logic;
+		WAIT_n     : in  std_logic;
+		INT_n      : in  std_logic;
+		NMI_n      : in  std_logic;
+		BUSRQ_n    : in  std_logic;
+		M1_n       : out std_logic;
+		IORQ       : out std_logic;
+		NoRead     : out std_logic;
+		Write      : out std_logic;
+		RFSH_n     : out std_logic;
+		HALT_n     : out std_logic;
+		BUSAK_n    : out std_logic;
+		A          : out std_logic_vector(15 downto 0);
+		DInst      : in  std_logic_vector(7 downto 0);
+		DI         : in  std_logic_vector(7 downto 0);
+		DO         : out std_logic_vector(7 downto 0);
+		MC         : out std_logic_vector(2 downto 0);
+		TS         : out std_logic_vector(2 downto 0);
+		IntCycle_n : out std_logic;
+		IntE       : out std_logic;
+		Stop       : out std_logic;
+		REG	     : out std_logic_vector(207 downto 0) -- IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 	);
 end T80;
 
@@ -145,7 +154,7 @@ architecture rtl of T80 is
 	signal Alternate            : std_logic;
 
 	-- Help Registers
-	signal TmpAddr              : std_logic_vector(15 downto 0);        -- Temporary address register
+	signal WZ                   : std_logic_vector(15 downto 0);        -- MEMPTR register
 	signal IR                   : std_logic_vector(7 downto 0);         -- Instruction register
 	signal ISet                 : std_logic_vector(1 downto 0);         -- Instruction set selector
 	signal RegBusA_r            : std_logic_vector(15 downto 0);
@@ -236,12 +245,13 @@ architecture rtl of T80 is
 	signal I_RRD                : std_logic;
 	signal I_RXDD               : std_logic;
 	signal I_INRC               : std_logic;
+	signal SetWZ                : std_logic_vector(1 downto 0);
 	signal SetDI                : std_logic;
 	signal SetEI                : std_logic;
 	signal IMode                : std_logic_vector(1 downto 0);
 	signal Halt                 : std_logic;
 	signal XYbit_undoc          : std_logic;
-	signal DOR				: std_logic_vector(127 downto 0);
+	signal DOR                  : std_logic_vector(127 downto 0);
 
 begin
 
@@ -308,6 +318,7 @@ begin
 			I_RLD       => I_RLD,
 			I_RRD       => I_RRD,
 			I_INRC      => I_INRC,
+			SetWZ       => SetWZ,
 			SetDI       => SetDI,
 			SetEI       => SetEI,
 			IMode       => IMode,
@@ -330,7 +341,7 @@ begin
 		port map(
 			Arith16 => Arith16_r,
 			Z16     => Z16_r,
-			WZ      => TmpAddr,
+			WZ      => WZ,
 			XY_State=> XY_State,
 			ALU_Op  => ALU_Op_r,
 			IR      => IR(5 downto 0),
@@ -361,7 +372,7 @@ begin
 		if RESET_n = '0' then
 			PC <= (others => '0');  -- Program Counter
 			A <= (others => '0');
-			TmpAddr <= (others => '0');
+			WZ <= (others => '0');
 			IR <= "00000000";
 			ISet <= "00";
 			XY_State <= "00";
@@ -468,23 +479,23 @@ begin
 					BTR_r <= (I_BT or I_BC or I_BTR) and not No_BTR;
 					if Jump = '1' then
 						A(15 downto 8) <= DI_Reg;
-						A(7 downto 0) <= TmpAddr(7 downto 0);
+						A(7 downto 0) <= WZ(7 downto 0);
 						PC(15 downto 8) <= unsigned(DI_Reg);
-						PC(7 downto 0) <= unsigned(TmpAddr(7 downto 0));
+						PC(7 downto 0) <= unsigned(WZ(7 downto 0));
 					elsif JumpXY = '1' then
 						A <= RegBusC;
 						PC <= unsigned(RegBusC);
 					elsif Call = '1' or RstP = '1' then
-						A <= TmpAddr;
-						PC <= unsigned(TmpAddr);
+						A <= WZ;
+						PC <= unsigned(WZ);
 					elsif MCycle = MCycles and NMICycle = '1' then
 						A <= "0000000001100110";
 						PC <= "0000000001100110";
 					elsif MCycle = "011" and IntCycle = '1' and IStatus = "10" then
 						A(15 downto 8) <= I;
-						A(7 downto 0) <= TmpAddr(7 downto 0);
+						A(7 downto 0) <= WZ(7 downto 0);
 						PC(15 downto 8) <= unsigned(I);
-						PC(7 downto 0) <= unsigned(TmpAddr(7 downto 0));
+						PC(7 downto 0) <= unsigned(WZ(7 downto 0));
 					else
 						case Set_Addr_To is
 						when aXY =>
@@ -494,7 +505,7 @@ begin
 								if NextIs_XY_Fetch = '1' then
 									A <= std_logic_vector(PC);
 								else
-									A <= TmpAddr;
+									A <= WZ;
 								end if;
 							end if;
 						when aIOA =>
@@ -508,6 +519,7 @@ begin
 								A(15 downto 8) <= ACC;
 							end if;
 							A(7 downto 0) <= DI_Reg;
+							WZ <= (ACC & DI_Reg) + "1";
 						when aSP =>
 							A <= std_logic_vector(SP);
 						when aBC =>
@@ -517,19 +529,38 @@ begin
 								A(7 downto 0) <= RegBusC(7 downto 0);
 							else
 								A <= RegBusC;
+								if SetWZ = "01" then
+									WZ <= RegBusC + "1";
+								end if;
+								if SetWZ = "10" then
+									WZ(7 downto 0) <= RegBusC(7 downto 0) + "1";
+									WZ(15 downto 8) <= ACC;
+								end if;
 							end if;
 						when aDE =>
 							A <= RegBusC;
+							if SetWZ = "10" then
+								WZ(7 downto 0) <= RegBusC(7 downto 0) + "1";
+								WZ(15 downto 8) <= ACC;
+							end if;
 						when aZI =>
 							if Inc_WZ = '1' then
-								A <= std_logic_vector(unsigned(TmpAddr) + 1);
+								A <= std_logic_vector(unsigned(WZ) + 1);
 							else
 								A(15 downto 8) <= DI_Reg;
-								A(7 downto 0) <= TmpAddr(7 downto 0);
+								A(7 downto 0) <= WZ(7 downto 0);
+								if SetWZ = "10" then
+									WZ(7 downto 0) <= WZ(7 downto 0) + "1";
+									WZ(15 downto 8) <= ACC;
+								end if;
 							end if;
 						when others =>
 							A <= std_logic_vector(PC);
 						end case;
+					end if;
+					
+					if SetWZ = "11" then
+						WZ <= std_logic_vector(ID16);
 					end if;
 
 					Save_ALU_r <= Save_ALU;
@@ -576,6 +607,7 @@ begin
 					end if;
 					if JumpE = '1' then
 						PC <= unsigned(signed(PC) + signed(DI_Reg));
+						WZ <= std_logic_vector(signed(PC) + signed(DI_Reg));
 					elsif Inc_PC = '1' then
 						PC <= PC + 1;
 					end if;
@@ -583,12 +615,18 @@ begin
 						PC <= PC - 2;
 					end if;
 					if RstP = '1' then
-						TmpAddr <= (others =>'0');
-						TmpAddr(5 downto 3) <= IR(5 downto 3);
+						WZ <= (others =>'0');
+						WZ(5 downto 3) <= IR(5 downto 3);
 					end if;
 				end if;
 				if TState = 3 and MCycle = "110" then
-					TmpAddr <= std_logic_vector(signed(RegBusC) + signed(DI_Reg));
+					WZ <= std_logic_vector(signed(RegBusC) + signed(DI_Reg));
+				end if;
+
+				if MCycle = "011" and TState = 4 and No_BTR = '0' then
+					if I_BT = '1' or I_BC = '1' then
+						WZ <= std_logic_vector(PC)-"1";
+					end if;
 				end if;
 
 				if (TState = 2 and Wait_n = '1') or (TState = 4 and MCycle = "001") then
@@ -617,10 +655,10 @@ begin
 
 			if TState = 3 then
 				if LDZ = '1' then
-					TmpAddr(7 downto 0) <= DI_Reg;
+					WZ(7 downto 0) <= DI_Reg;
 				end if;
 				if LDW = '1' then
-					TmpAddr(15 downto 8) <= DI_Reg;
+					WZ(15 downto 8) <= DI_Reg;
 				end if;
 
 				if Special_LD(2) = '1' then
