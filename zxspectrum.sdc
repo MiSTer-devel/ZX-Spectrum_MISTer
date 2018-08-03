@@ -41,21 +41,19 @@ set_multicycle_path -to {emu:emu|wd1793:fdd|wait_time[*]} -hold 2
 
 set_multicycle_path -from {emu:emu|u765:u765|u765_dpram:sbuf|*} -setup 2
 set_multicycle_path -from {emu:emu|u765:u765|u765_dpram:sbuf|*} -hold 2
-
 set_multicycle_path -from {emu:emu|u765:u765|altsyncram:image_track_offsets_rtl_0|*} -setup 2
 set_multicycle_path -from {emu:emu|u765:u765|altsyncram:image_track_offsets_rtl_0|*} -hold 2
-
-set_multicycle_path -to {emu:emu|u765:u765|seek_pos[*]} -setup 2
-set_multicycle_path -to {emu:emu|u765:u765|seek_pos[*]} -hold 2
+set_multicycle_path -to {emu:emu|u765:u765|i_*} -setup 2
+set_multicycle_path -to {emu:emu|u765:u765|i_*} -hold 2
+set_multicycle_path -to {emu:emu|u765:u765|i_*[*]} -setup 2
+set_multicycle_path -to {emu:emu|u765:u765|i_*[*]} -hold 2
+set_multicycle_path -to {emu:emu|u765:u765|pcn[*]} -setup 2
+set_multicycle_path -to {emu:emu|u765:u765|pcn[*]} -hold 2
+set_multicycle_path -to {emu:emu|u765:u765|ncn[*]} -setup 2
+set_multicycle_path -to {emu:emu|u765:u765|ncn[*]} -hold 2
 set_multicycle_path -to {emu:emu|u765:u765|state[*]} -setup 2
 set_multicycle_path -to {emu:emu|u765:u765|state[*]} -hold 2
 set_multicycle_path -to {emu:emu|u765:u765|status[*]} -setup 2
 set_multicycle_path -to {emu:emu|u765:u765|status[*]} -hold 2
-set_multicycle_path -to {emu:emu|u765:u765|image_track_offsets_addr[*]} -setup 2
-set_multicycle_path -to {emu:emu|u765:u765|image_track_offsets_addr[*]} -hold 2
-set_multicycle_path -to {emu:emu|u765:u765|buff_addr[*]} -setup 2
-set_multicycle_path -to {emu:emu|u765:u765|buff_addr[*]} -hold 2
-set_multicycle_path -to {emu:emu|u765:u765|bytes_to_read[*]} -setup 2
-set_multicycle_path -to {emu:emu|u765:u765|bytes_to_read[*]} -hold 2
-set_multicycle_path -to {emu:emu|u765:u765|timeout[*]} -setup 2
-set_multicycle_path -to {emu:emu|u765:u765|timeout[*]} -hold 2
+set_multicycle_path -to {emu:emu|u765:u765|i_rpm_time[*][*][*]} -setup 8
+set_multicycle_path -to {emu:emu|u765:u765|i_rpm_time[*][*][*]} -hold 8

@@ -205,6 +205,7 @@ always @(posedge clk_sys) begin
 	reg       image_ready[2] = '{ 0, 0 };
 	reg [7:0] image_tracks[2];
 	reg       image_sides[2]; //1 side - 0, 2 sides - 1
+	reg [1:0] image_wp;
 	reg       image_trackinfo_dirty[2];
 	reg       image_edsk[2]; //DSK - 0, EDSK - 1
 	reg [1:0] image_scan_state[2] = '{ 0, 0 };
@@ -224,14 +225,13 @@ always @(posedge clk_sys) begin
 	reg [7:0] i_track_size;
 	reg [31:0] i_seek_pos;
 	reg [7:0] i_sector_c, i_sector_h, i_sector_r, i_sector_n;
-	reg [7:0] sector_st1, sector_st2;
+	reg [7:0] i_sector_st1, i_sector_st2;
 	reg [15:0] i_sector_size;
 	reg [7:0] i_current_sector;
 	reg [2:0] i_weak_sector;
 	reg [15:0] i_bytes_to_read;
-	reg [2:0] substate;
+	reg [2:0] i_substate;
 	reg [1:0] old_mounted;
-	reg [1:0] image_wp;
 	reg [15:0] i_track_offset;
 	reg [5:0] ack;
 	reg sd_busy;
@@ -239,7 +239,7 @@ always @(posedge clk_sys) begin
 	reg [7:0] i_head_timer;
 	reg i_rtrack, i_write, i_rw_deleted;
 	reg [7:0] status[4] = '{0, 0, 0, 0}; //st0-3
-	state_t state, command;
+	state_t state, i_command;
    reg i_current_drive, i_scan_lock = 0;
 	reg [3:0] i_srt; //stepping rate
 //	reg [3:0] i_hut; //head unload time
@@ -433,7 +433,7 @@ always @(posedge clk_sys) begin
 					//i_mfm <= din[6];
 					i_sk <= din[5];
 
-					substate <= 0;
+					i_substate <= 0;
 					casex (din[7:0])
 						8'bXXX_00110: state <= COMMAND_READ_DATA;
 						8'bXXX_01100: state <= COMMAND_READ_DELETED_DATA;
@@ -577,7 +577,7 @@ always @(posedge clk_sys) begin
 				end else begin
 					hds <= din[2];
 					m_status[UPD765_MAIN_RQM] <= 0;
-					command <= COMMAND_READ_ID2;
+					i_command <= COMMAND_READ_ID2;
 					state <= COMMAND_RELOAD_TRACKINFO;
 				end
 			end
@@ -629,7 +629,7 @@ always @(posedge clk_sys) begin
 			COMMAND_READ_TRACK:
 			begin
 				int_state <= '{ 0, 0 };
-				command <= COMMAND_RW_DATA_EXEC;
+				i_command <= COMMAND_RW_DATA_EXEC;
 				state <= COMMAND_SETUP;
 				{i_rtrack, i_write, i_rw_deleted} <= 3'b100;
 			end
@@ -637,7 +637,7 @@ always @(posedge clk_sys) begin
 			COMMAND_WRITE_DATA:
 			begin
 				int_state <= '{ 0, 0 };
-				command <= COMMAND_RW_DATA_EXEC;
+				i_command <= COMMAND_RW_DATA_EXEC;
 				state <= COMMAND_SETUP;
 				{i_rtrack, i_write, i_rw_deleted} <= 3'b010;
 			end
@@ -645,7 +645,7 @@ always @(posedge clk_sys) begin
 			COMMAND_WRITE_DELETED_DATA:
 			begin
 				int_state <= '{ 0, 0 };
-				command <= COMMAND_RW_DATA_EXEC;
+				i_command <= COMMAND_RW_DATA_EXEC;
 				state <= COMMAND_SETUP;
 				{i_rtrack, i_write, i_rw_deleted} <= 3'b011;
 			end
@@ -653,7 +653,7 @@ always @(posedge clk_sys) begin
 			COMMAND_READ_DATA:
 			begin
 				int_state <= '{ 0, 0 };
-				command <= COMMAND_RW_DATA_EXEC;
+				i_command <= COMMAND_RW_DATA_EXEC;
 				state <= COMMAND_SETUP;
 				{i_rtrack, i_write, i_rw_deleted} <= 3'b000;
 			end
@@ -661,7 +661,7 @@ always @(posedge clk_sys) begin
 			COMMAND_READ_DELETED_DATA:
 			begin
 				int_state <= '{ 0, 0 };
-				command <= COMMAND_RW_DATA_EXEC;
+				i_command <= COMMAND_RW_DATA_EXEC;
 				state <= COMMAND_SETUP;
 				{i_rtrack, i_write, i_rw_deleted} <= 3'b001;
 			end
@@ -674,7 +674,7 @@ always @(posedge clk_sys) begin
 				state <= COMMAND_READ_RESULTS;
 			end else begin
 				m_status[UPD765_MAIN_RQM] <= 0;
-				command <= COMMAND_RW_DATA_EXEC1;
+				i_command <= COMMAND_RW_DATA_EXEC1;
 				state <= COMMAND_RELOAD_TRACKINFO;
 			end
 
@@ -721,8 +721,8 @@ always @(posedge clk_sys) begin
 						1: i_sector_h <= buff_data_in;
 						2: i_sector_r <= buff_data_in;
 						3: i_sector_n <= buff_data_in;
-						4: sector_st1 <= buff_data_in;
-						5: sector_st2 <= buff_data_in;
+						4: i_sector_st1 <= buff_data_in;
+						5: i_sector_st2 <= buff_data_in;
 						6: if (image_edsk[ds0]) i_sector_size[7:0] <= buff_data_in;
 						7: begin
 								if (image_edsk[ds0]) i_sector_size[15:8] <= buff_data_in;
@@ -739,7 +739,7 @@ always @(posedge clk_sys) begin
 			if ((i_rtrack && i_current_sector == i_r) ||
 				(~i_rtrack && i_sector_c == i_c && i_sector_r == i_r && i_sector_h == i_h && (i_sector_n == i_n || !i_n))) begin
 				//sector found in the sector info list
-				if (i_sk & ~i_rtrack & (i_rw_deleted ^ sector_st2[6])) begin
+				if (i_sk & ~i_rtrack & (i_rw_deleted ^ i_sector_st2[6])) begin
 					state <= COMMAND_RW_DATA_EXEC8;
 				end else begin
 					i_bytes_to_read <= i_n ? (8'h80 << (i_n[3] ? 4'h8 : i_n[2:0])) : i_dtl;
@@ -778,7 +778,11 @@ always @(posedge clk_sys) begin
 					state <= COMMAND_RW_DATA_EXEC5;
 				end
 			end else begin
-				next_weak_sector[ds0] <= 0;
+				if (SPECCY_SPEEDLOCK_HACK & 
+					 i_current_sector == 2 & !pcn[ds0] & ~hds & i_sector_st1[5] & i_sector_st2[5])
+					next_weak_sector[ds0] <= next_weak_sector[ds0] + 1'd1;
+				else
+					next_weak_sector[ds0] <= 0;
 				if (i_bytes_to_read > i_sector_size) i_bytes_to_read <= i_sector_size;
 				state <= COMMAND_RW_DATA_EXEC5;
 			end
@@ -811,7 +815,7 @@ always @(posedge clk_sys) begin
 					m_status[UPD765_MAIN_EXM] <= 0;
 					status[0] <= 8'h40;
 					status[1] <= 8'h10; //overrun
-					status[2] <= sector_st2 | (i_rw_deleted ? 8'h40 : 8'h0);
+					status[2] <= i_sector_st2 | (i_rw_deleted ? 8'h40 : 8'h0);
 					state <= COMMAND_READ_RESULTS;
 				end else if (~m_status[UPD765_MAIN_RQM]) begin
 					m_status[UPD765_MAIN_RQM] <= 1;
@@ -820,13 +824,13 @@ always @(posedge clk_sys) begin
 						//sector continues on the next LBA
 						state <= COMMAND_RW_DATA_EXEC5;
 					end
-					//Speedlock: randomize 'weak' sectors last bytes
+					//Speedlock: fuzz 'weak' sectors last bytes
 					//weak sector is cyl 0, head 0, sector 2
 					m_data <= (SPECCY_SPEEDLOCK_HACK &
 								i_current_sector == 2 & !pcn[ds0] & ~hds &
-					         sector_st1[5] & sector_st2[5] & !i_bytes_to_read[14:2]) ?
-								i_timeout[7:0] :
-								buff_data_in;
+								i_sector_st1[5] & i_sector_st2[5] & !i_bytes_to_read[14:4]) ?
+						 buff_data_in << next_weak_sector[ds0] : buff_data_in;
+
 					buff_addr <= buff_addr + 1'd1;
 					buff_wait <= 1;
 					m_status[UPD765_MAIN_RQM] <= 0;
@@ -867,20 +871,20 @@ always @(posedge clk_sys) begin
 			//End of reading/writing sector, what's next?
 			COMMAND_RW_DATA_EXEC8:
 			if (~sd_busy) begin
-				if (~i_rtrack & ~(i_sk & (i_rw_deleted ^ sector_st2[6])) &
-					((sector_st1[5] & sector_st2[5]) | (i_rw_deleted ^ sector_st2[6]))) begin
+				if (~i_rtrack & ~(i_sk & (i_rw_deleted ^ i_sector_st2[6])) &
+					((i_sector_st1[5] & i_sector_st2[5]) | (i_rw_deleted ^ i_sector_st2[6]))) begin
 					//deleted mark or crc error
 					m_status[UPD765_MAIN_EXM] <= 0;
 					status[0] <= 8'h40;
-					status[1] <= sector_st1;
-					status[2] <= sector_st2 | (i_rw_deleted ? 8'h40 : 8'h0);
+					status[1] <= i_sector_st1;
+					status[2] <= i_sector_st2 | (i_rw_deleted ? 8'h40 : 8'h0);
 					state <= COMMAND_READ_RESULTS;
 				end else	if ((i_rtrack ? i_current_sector : i_sector_r) == i_eot) begin
 					//end of cylinder
 					m_status[UPD765_MAIN_EXM] <= 0;
 					status[0] <= i_rtrack ? 8'h00 : 8'h40;
 					status[1] <= 8'h80;
-					status[2] <= (i_rw_deleted ^ sector_st2[6]) ? 8'h40 : 8'h0;
+					status[2] <= (i_rw_deleted ^ i_sector_st2[6]) ? 8'h40 : 8'h0;
 					state <= COMMAND_READ_RESULTS;
 				end else begin
 					//read the next sector (multi-sector transfer)
@@ -987,39 +991,39 @@ always @(posedge clk_sys) begin
 
 			COMMAND_SETUP:
 			if (!old_wr & wr & a0) begin
-				case (substate)
+				case (i_substate)
 					0: begin
 							ds0 <= din[0];
 							hds <= din[2];
-							substate <= 1;
+							i_substate <= 1;
 						end
 					1: begin
 							i_c <= din;
-							substate <= 2;
+							i_substate <= 2;
 						end
 					2:	begin
 							i_h <= din;
-							substate <= 3;
+							i_substate <= 3;
 						end
 					3: begin
 							i_r <= din;
-							substate <= 4;
+							i_substate <= 4;
 						end
 					4: begin
 							i_n <= din;
-							substate <= 5;
+							i_substate <= 5;
 						end
 					5: begin
 							i_eot <= din;
-							substate <= 6;
+							i_substate <= 6;
 						end
 					6:	begin
 							//i_gpl <= din;
-							substate <= 7;
+							i_substate <= 7;
 						end
 					7: begin
 							i_dtl <= din;
-							substate <= 0;
+							i_substate <= 0;
 							if (~motor[ds0] | ~ready[ds0] | ~image_ready[ds0]) begin
 								status[0] <= 8'h40;
 								status[1] <= 8'b101;
@@ -1032,7 +1036,7 @@ always @(posedge clk_sys) begin
 								status[2] <= 0;
 								state <= COMMAND_READ_RESULTS;
 							end else begin
-								state <= command;
+								state <= i_command;
 							end
 						end
 				endcase
@@ -1043,30 +1047,30 @@ always @(posedge clk_sys) begin
 				m_status[UPD765_MAIN_RQM] <= 1;
 				m_status[UPD765_MAIN_DIO] <= 1;
 				if (~old_rd & rd & a0) begin
-					case (substate)
+					case (i_substate)
 						0: begin
 								m_data <= { status[0][7:3], hds, 1'b0, ds0 };
-								substate <= 1;
+								i_substate <= 1;
 							end
 						1: begin
 								m_data <= status[1];
-								substate <= 2;
+								i_substate <= 2;
 							end
 						2: begin
 								m_data <= status[2];
-								substate <= 3;
+								i_substate <= 3;
 							end
 						3: begin
 								m_data <= i_sector_c;
-								substate <= 4;
+								i_substate <= 4;
 							end
 						4: begin
 								m_data <= i_sector_h;
-								substate <= 5;
+								i_substate <= 5;
 							end
 						5: begin
 								m_data <= i_sector_r;
-								substate <= 6;
+								i_substate <= 6;
 							end
 						6: begin
 								m_data <= i_sector_n;
@@ -1101,7 +1105,7 @@ always @(posedge clk_sys) begin
 				buff_wait <= 1;
 				state <= COMMAND_RELOAD_TRACKINFO1;
 			end else begin
-				state <= command;
+				state <= i_command;
 			end
 
 			COMMAND_RELOAD_TRACKINFO1:
@@ -1115,7 +1119,7 @@ always @(posedge clk_sys) begin
 				end else begin
 					image_trackinfo_dirty[ds0] <= 0;
 					hds <= old_hds;
-					state <= command;
+					state <= i_command;
 				end
 			end
 
@@ -1137,7 +1141,7 @@ always @(posedge clk_sys) begin
 				if (hds == image_sides[ds0]) begin
 					image_trackinfo_dirty[ds0] <= 0;
 					hds <= old_hds;
-					state <= command;
+					state <= i_command;
 				end else begin //read TrackInfo from the other head if 2 sided
 					image_track_offsets_addr <= { pcn[ds0], 1'b1 };
 					hds <= 1;
