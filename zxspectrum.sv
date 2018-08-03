@@ -497,6 +497,7 @@ wire [5:0] page_ram     = {page_128k, page_reg[2:0]};
 wire       page_write   = ~addr[15] & ~addr[1] & (addr[14] | ~plus3) & ~page_disable; //7ffd
 wire       page_write_plus3 = ~addr[1] & addr[12] & ~addr[13] & ~addr[14] & ~addr[15] & plus3 & ~page_disable; //1ffd
 wire       page_special = page_reg_plus3[0];
+wire       motor_plus3 = page_reg_plus3[3];
 wire       page_p1024 = addr[15] & addr[14] & addr[13] & ~addr[12] & ~addr[3]; //eff7
 reg  [2:0] page_128k;
 
@@ -854,13 +855,15 @@ wd1793 #(1) fdd
 );
 
 
-u765 u765
+u765 #(20'd1800,1) u765
 (
 	.clk_sys(clk_sys),
 	.ce(ce_u765),
 	.reset(reset),
 	.a0(addr[12]),
 	.ready(plus3_fdd_ready),
+	.motor(motor_plus3),
+	.available(2'b01),
 	.nRD(~plus3_fdd | nIORQ | ~nM1 | nRD),
 	.nWR(~plus3_fdd | nIORQ | ~nM1 | nWR),
 	.din(cpu_dout),
@@ -868,6 +871,7 @@ u765 u765
 
 	.img_mounted(img_mounted),
 	.img_size(img_size[19:0]),
+	.img_wp(fdd_ro),
 	.sd_lba(sd_lba_plus3),
 	.sd_rd(sd_rd_plus3),
 	.sd_wr(sd_wr_plus3),
