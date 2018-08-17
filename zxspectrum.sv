@@ -1,10 +1,7 @@
 //============================================================================
-//  Sinclair ZX Spectrum
-// 
-//  Port to MiSTer.
+//  Sinclair ZX Spectrum for MiSTer
 //  Copyright (C) 2017,2018 Sorgelig
 //
-//  Based on sample ZX Spectrum code by Goran Devic
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -138,7 +135,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.88.",`BUILD_DATE
+	"V,v3.89.",`BUILD_DATE
 };
 
 
@@ -362,19 +359,18 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, rom_sel, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
-		'b01XXXXXXXXX: cpu_din = tape_dout;
-		'b000XXXXXXXX: cpu_din = ram_dout;
-		'b001XXXXXXXX: cpu_din = rom_dout;
-		'b1XX01XXXXXX: cpu_din = fdd_dout;
-		'b1XX001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
-		'b1XX0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
-		'b1XX00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1XX0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1XX00000101: cpu_din = ulap_dout;
-		'b1XX00000100: cpu_din = port_ff;
-		'b1XX000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
-		'b1XX1XXXXXXX: cpu_din = 8'hFF;
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
+		'b01XXXXXXXX: cpu_din = tape_dout;
+		'b00XXXXXXXX: cpu_din = ram_dout;
+		'b1X01XXXXXX: cpu_din = fdd_dout;
+		'b1X001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
+		'b1X0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
+		'b1X00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
+		'b1X0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
+		'b1X00000101: cpu_din = ulap_dout;
+		'b1X00000100: cpu_din = port_ff;
+		'b1X000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
+		'b1X1XXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
 
@@ -407,9 +403,9 @@ wire        ram_ready;
 
 always_comb begin
 	casex({dma, tape_req, page_special, addr[15:14]})
-		'b1X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h200000);
+		'b1X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
 		'b01_X_XX: ram_addr = tape_addr;
-		'b00_0_00: ram_addr = { 4'b1000, page_rom,   addr[13:0]}; //ROM
+		'b00_0_00: ram_addr = { 3'b101, page_rom,    addr[13:0]}; //ROM
 		'b00_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
 		'b00_0_10: ram_addr = {        3'd2,         addr[13:0]};
 		'b00_0_11: ram_addr = {    page_ram,         addr[13:0]};
@@ -453,33 +449,16 @@ sdram ram
 );
 
 wire vram_we = (ram_addr[24:16] == 1) & ram_addr[14];
-dpram #(.ADDRWIDTH(15)) vram
+vram vram
 (
     .clock(clk_sys),
 
-    .address_a({ram_addr[15], ram_addr[13:0]}),
-    .data_a(ram_din),
-    .wren_a(ram_we & vram_we),
+    .wraddress({ram_addr[15], ram_addr[13:0]}),
+    .data(ram_din),
+    .wren(ram_we & vram_we),
 
-    .address_b(vram_addr),
-    .data_b(0),
-    .wren_b(0),
-    .q_b(vram_dout)
-);
-
-wire  [7:0] rom_dout;
-wire        rom_sel = (ram_addr[24:18] == 'b1000);
-dpram #(.ADDRWIDTH(18), .NUMWORDS(180224), .MEM_INIT_FILE("bios.mif")) rom
-(
-    .clock(clk_sys),
-	 .address_a(ram_addr[17:0]),
-	 .data_a(ram_din),
-	 .wren_a(rom_sel && ram_we),
-	 .q_a(rom_dout),
-	 
-	 .address_b(0),
-	 .data_b(0),
-	 .wren_b(0)
+    .rdaddress(vram_addr),
+    .q(vram_dout)
 );
 
 (* maxfan = 10 *) reg	zx48;
@@ -506,12 +485,12 @@ wire       active_48_rom = zx48 | (page_reg[4] & ~plus3) | (plus3 & page_reg[4] 
 
 always_comb begin
 	casex({shadow_rom, trdos_en, plusd_mem, mf128_mem, plus3})
-		'b1XXXX: page_rom <=   4'b0000; //shadow
-		'b01XXX: page_rom <=   4'b0001; //trdos
-		'b001XX: page_rom <=   4'b1000; //plusd
-		'b0001X: page_rom <= { 2'b10, plus3, ~plus3 }; //MF128/+3
-		'b00001: page_rom <= { 2'b01, page_reg_plus3[2], page_reg[4] }; //+3
-		'b00000: page_rom <= { 3'b001, zx48 | page_reg[4] }; //up to +2
+		'b1XXXX: page_rom <=   4'b0100; //shadow
+		'b01XXX: page_rom <=   4'b0101; //trdos
+		'b001XX: page_rom <=   4'b1100; //plusd
+		'b0001X: page_rom <= { 2'b11, plus3, ~plus3 }; //MF128/+3
+		'b00001: page_rom <= { 2'b10, page_reg_plus3[2], page_reg[4] }; //+3
+		'b00000: page_rom <= { 3'b011, zx48 | page_reg[4] }; //up to +2
 	endcase
 end
 
@@ -943,77 +922,6 @@ always @(posedge clk_sys) begin
 end
 
 assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
-
-endmodule
-
-module dpram #(parameter DATAWIDTH=8, ADDRWIDTH=8, NUMWORDS=1<<ADDRWIDTH, MEM_INIT_FILE="")
-(
-	input	                 clock,
-
-	input	 [ADDRWIDTH-1:0] address_a,
-	input	 [DATAWIDTH-1:0] data_a,
-	input	                 wren_a,
-	output [DATAWIDTH-1:0] q_a,
-
-	input	 [ADDRWIDTH-1:0] address_b,
-	input	 [DATAWIDTH-1:0] data_b,
-	input	                 wren_b,
-	output [DATAWIDTH-1:0] q_b
-);
-
-altsyncram	altsyncram_component (
-			.address_a (address_a),
-			.address_b (address_b),
-			.clock0 (clock),
-			.data_a (data_a),
-			.data_b (data_b),
-			.wren_a (wren_a),
-			.wren_b (wren_b),
-			.q_a (q_a),
-			.q_b (q_b),
-			.aclr0 (1'b0),
-			.aclr1 (1'b0),
-			.addressstall_a (1'b0),
-			.addressstall_b (1'b0),
-			.byteena_a (1'b1),
-			.byteena_b (1'b1),
-			.clock1 (1'b1),
-			.clocken0 (1'b1),
-			.clocken1 (1'b1),
-			.clocken2 (1'b1),
-			.clocken3 (1'b1),
-			.eccstatus (),
-			.rden_a (1'b1),
-			.rden_b (1'b1));
-defparam
-	altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK0",
-	altsyncram_component.address_reg_b = "CLOCK0",
-	altsyncram_component.indata_reg_b = "CLOCK0",
-	altsyncram_component.numwords_a = NUMWORDS,
-	altsyncram_component.numwords_b = NUMWORDS,
-	altsyncram_component.widthad_a = ADDRWIDTH,
-	altsyncram_component.widthad_b = ADDRWIDTH,
-	altsyncram_component.width_a = DATAWIDTH,
-	altsyncram_component.width_b = DATAWIDTH,
-	altsyncram_component.width_byteena_a = 1,
-	altsyncram_component.width_byteena_b = 1,
-
-	altsyncram_component.init_file = MEM_INIT_FILE, 
-	altsyncram_component.clock_enable_input_a = "BYPASS",
-	altsyncram_component.clock_enable_input_b = "BYPASS",
-	altsyncram_component.clock_enable_output_a = "BYPASS",
-	altsyncram_component.clock_enable_output_b = "BYPASS",
-	altsyncram_component.intended_device_family = "Cyclone V",
-	altsyncram_component.lpm_type = "altsyncram",
-	altsyncram_component.operation_mode = "BIDIR_DUAL_PORT",
-	altsyncram_component.outdata_aclr_a = "NONE",
-	altsyncram_component.outdata_aclr_b = "NONE",
-	altsyncram_component.outdata_reg_a = "UNREGISTERED",
-	altsyncram_component.outdata_reg_b = "UNREGISTERED",
-	altsyncram_component.power_up_uninitialized = "FALSE",
-	altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-	altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
-	altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ";
 
 
 endmodule
