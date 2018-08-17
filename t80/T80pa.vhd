@@ -168,6 +168,9 @@ begin
 				else
 					CEN_pol <= '0';
 				end if;
+				if TState = "011" and BUSAK = '1' then
+					DI_Reg <= DI;
+				end if;
 				if MCycle = "001" then
 					if TState = "001" then
 						IntCycleD_n <= IntCycleD_n(0) & IntCycle_n;
@@ -185,9 +188,6 @@ begin
 						MREQ_n <= '1';
 					end if;
 				else
-					if TState = "011" and BUSAK = '1' then
-						DI_Reg <= DI;
-					end if;
 					if NoRead = '0' and IORQ = '0' then
 						if TState = "001" then
 							RD_n   <= Write;
