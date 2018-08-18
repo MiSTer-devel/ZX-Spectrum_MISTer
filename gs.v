@@ -65,7 +65,7 @@
 
 */
 
-module gs #(parameter PAGES=4, ROMFILE="gs105a.mif")
+module gs #(parameter PAGES=4, ROMFILE="gs105b.mif")
 (
    input         RESET,
    input         CLK,
