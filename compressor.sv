@@ -20,13 +20,29 @@
 
 module compressor
 (
-	input         clk,
-	input  [11:0] in1, in2,
-	output [15:0] out1, out2
+	input             clk,
+	input      [11:0] in1, in2,
+	output reg [15:0] out1, out2
 );
 
-always @(posedge clk) out1 <= {in1[11], in1[11] ? ~tbl[~in1[10:0]] : tbl[in1[10:0]]};
-always @(posedge clk) out2 <= {in2[11], in2[11] ? ~tbl[~in2[10:0]] : tbl[in2[10:0]]};
+always @(posedge clk) begin
+	reg ch;
+	reg [15:0] outm;
+	reg [11:0] addrm;
+	reg [11:0] addr;
+
+	ch <= ~ch;
+	if(ch) begin
+		addr  <= {in1[11], in1[11] ? ~in1[10:0] : in1[10:0]};
+		addrm <= {in2[11], in2[11] ? ~in2[10:0] : in2[10:0]};
+		outm  <= {addr[11], addr[11] ? ~tbl[addr[10:0]] : tbl[addr[10:0]]};
+	end
+	else begin
+		addr  <= addrm;
+		out1  <= {addr[11], addr[11] ? ~tbl[addr[10:0]] : tbl[addr[10:0]]};
+		out2  <= outm;
+	end
+end
 
 wire [14:0] tbl[0:2047] = 
 '{
