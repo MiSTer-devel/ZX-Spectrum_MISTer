@@ -4,6 +4,7 @@
    General Sound
   -----------------------------------------------------------------------------
    18.08.2018	Reworked first verilog version
+   19.08.2018	Produce proper signed output
   
    CPU: Z80 @ 28MHz
    ROM: 32K
@@ -70,20 +71,19 @@ module gs #(parameter PAGES=4, ROMFILE="gs105a.mif")
    input         CLK,
    input         CE,
 
-   input  [15:0] A,
+   input         A,
    input   [7:0] DI,
    output  [7:0] DO,
+   input         CS_n, 
    input         WR_n,
    input         RD_n,
-   input         IORQ_n,
 
-	input             MUTE,
-   output reg [14:0] OUTL,
-   output reg [14:0] OUTR
+   output [14:0] OUTL,
+   output [14:0] OUTR
 );
 
 // port #xxBB : #xxB3
-assign DO = A[3] ? {bit7, 6'b111111, bit0} : port_03;
+assign DO = A ? {bit7, 6'b111111, bit0} : port_03;
 
 // CPU
 reg         int_n;
@@ -144,12 +144,10 @@ always @(posedge CLK) begin
 			'hB: bit0 <=  port_09[5];
 		endcase
 	end
-	else if (~IORQ_n) begin
-		if (A[7:0] == 8'hB3) begin
-			if (~RD_n) bit7 <= 0;
-			if (~WR_n) bit7 <= 1;
-		end
-		if (A[7:0] == 8'hBB && ~WR_n) bit0 <= 1;
+	else if (~CS_n) begin
+		if (~A & ~RD_n) bit7 <= 0;
+		if (~A & ~WR_n) bit7 <= 1;
+		if ( A & ~WR_n) bit0 <= 1;
 	end
 end
 
@@ -161,24 +159,16 @@ always @(posedge CLK) begin
 		port_BB <= 0;
 		port_B3 <= 0;
 	end
-	else if (~IORQ_n && ~WR_n) begin
-		if(A[7:0] == 8'hBB) port_BB <= DI;
-		if(A[7:0] == 8'hB3) port_B3 <= DI;
+	else if (~CS_n && ~WR_n) begin
+		if(A) port_BB <= DI;
+		else  port_B3 <= DI;
 	end
 end
 
-
-reg [7:0] ch_a;
-reg [7:0] ch_b;
-reg [7:0] ch_c;
-reg [7:0] ch_d;
-
 reg [3:0] port_00;
 reg [7:0] port_03;
-reg [5:0] port_06;
-reg [5:0] port_07;
-reg [5:0] port_08;
-reg [5:0] port_09;
+reg signed [6:0] port_06, port_07, port_08, port_09;
+reg signed [7:0] ch_a, ch_b, ch_c, ch_d;
 
 always @(posedge CLK) begin
 	if (RESET) begin
@@ -199,15 +189,13 @@ always @(posedge CLK) begin
 
 		if (~cpu_mreq_n && ~cpu_rd_n && cpu_a_bus[15:13] == 3) begin
 			case(cpu_a_bus[9:8])
-				0: ch_a <= mem_do;
-				1: ch_b <= mem_do;
-				2: ch_c <= mem_do;
-				3: ch_d <= mem_do;
+				0: ch_a <= {~mem_do[7],mem_do[6:0]};
+				1: ch_b <= {~mem_do[7],mem_do[6:0]};
+				2: ch_c <= {~mem_do[7],mem_do[6:0]};
+				3: ch_d <= {~mem_do[7],mem_do[6:0]};
 			endcase
 		end
 	end
-
-	if(MUTE) {ch_a,ch_b,ch_c,ch_d} <= 0;
 end
 
 wire [7:0] cpu_di_bus =
@@ -227,7 +215,7 @@ dpram #(.ADDRWIDTH(19), .NUMWORDS((PAGES+1)*32768), .MEM_INIT_FILE(ROMFILE)) mem
 	.q_a(mem_do)
 );
 
-reg [13:0] out_a,out_b,out_c,out_d;
+reg signed [14:0] out_a,out_b,out_c,out_d;
 always @(posedge CLK) begin
 	if(CE) begin
 		out_a <= ch_a * port_06;
@@ -237,11 +225,15 @@ always @(posedge CLK) begin
 	end
 end
 
+reg signed [14:0] outl, outr;
 always @(posedge CLK) begin
 	if(CE) begin
-		OUTL <= {1'b0, out_a} + {1'b0, out_b};
-		OUTR <= {1'b0, out_c} + {1'b0, out_d};
+		outl <= out_a + out_b;
+		outr <= out_c + out_d;
 	end
 end
+
+assign OUTL = outl;
+assign OUTR = outr;
 
 endmodule

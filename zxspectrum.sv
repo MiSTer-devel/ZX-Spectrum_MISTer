@@ -124,8 +124,6 @@ localparam CONF_STR1 = {
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"-;",
-	"O1,General Sound,Enabled,Disabled;",
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
@@ -566,7 +564,7 @@ end
 
 ////////////////////   AUDIO   ///////////////////
 wire  [7:0] sound_data;
-wire [11:0] psg_ch_l, psg_ch_r;
+wire [11:0] ts_l, ts_r;
 wire        psg_enable = addr[0] & addr[15] & ~addr[1];
 wire        psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
 reg         psg_reset;
@@ -585,8 +583,8 @@ turbosound turbosound
 	.BC(addr[14]),
 	.DI(cpu_dout),
 	.DO(sound_data),
-	.CHANNEL_L(psg_ch_l),
-	.CHANNEL_R(psg_ch_r)
+	.CHANNEL_L(ts_l),
+	.CHANNEL_R(ts_r)
 );
 
 reg  ce_saa;  //8MHz
@@ -599,8 +597,8 @@ always @(negedge clk_sys) begin
 	ce_saa <= !counter;
 end
 
-wire [7:0] saa_ch_l;
-wire [7:0] saa_ch_r;
+wire [7:0] saa_l;
+wire [7:0] saa_r;
 
 saa1099 saa1099
 (
@@ -611,8 +609,8 @@ saa1099 saa1099
 	.a0(addr[8]),
 	.wr_n(nWR),
 	.din(cpu_dout),
-	.out_l(saa_ch_l),
-	.out_r(saa_ch_r)
+	.out_l(saa_l),
+	.out_r(saa_r)
 );
 
 wire [7:0] gs_dout;
@@ -621,24 +619,25 @@ wire [14:0] gs_l, gs_r;
 // GS 352KB
 gs #(11) gs
 (
-	.RESET(aud_reset | status[1]),
+	.RESET(aud_reset),
 	.CLK(clk_sys),
 	.CE(ce_28m),
-	.A(addr),
+
+	.A(addr[3]),
 	.DI(cpu_dout),
 	.DO(gs_dout),
+	.CS_n(nIORQ | ~gs_sel),
 	.WR_n(nWR),
 	.RD_n(nRD),
-	.IORQ_n(nIORQ),
-	.MUTE(status[1]),
+
 	.OUTL(gs_l),
 	.OUTR(gs_r)
 );
 
-wire gs_sel = (addr[7:4] == 'b1011 && addr[2:0] == 'b011) && ~status[1];
+wire gs_sel = (addr[7:0] ==? 'b1011?011);
 
-wire [11:0] audio_l = psg_ch_l + {2'b00, saa_ch_l, 2'b00} + {2'b00, gs_l[14:5]} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
-wire [11:0] audio_r = psg_ch_r + {2'b00, saa_ch_r, 2'b00} + {2'b00, gs_r[14:5]} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+wire [11:0] audio_l = ts_l + {{3{gs_l[14]}}, gs_l[13:5]} + {2'b00, saa_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+wire [11:0] audio_r = ts_r + {{3{gs_r[14]}}, gs_r[13:5]} + {2'b00, saa_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
 
 compressor compressor
 (
