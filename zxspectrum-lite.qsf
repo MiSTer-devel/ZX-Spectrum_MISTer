@@ -363,12 +363,13 @@ set_global_assignment -name SYSTEMVERILOG_FILE saa1099.sv
 set_global_assignment -name SYSTEMVERILOG_FILE turbosound.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ym2149.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ym2203.sv
+set_global_assignment -name VERILOG_FILE gs.v
 set_global_assignment -name SYSTEMVERILOG_FILE compressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE u765.sv
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE video.sv
-set_global_assignment -name VERILOG_FILE vram.v
+set_global_assignment -name VERILOG_FILE dpram.v
 set_global_assignment -name SYSTEMVERILOG_FILE tape.sv
 set_global_assignment -name VERILOG_FILE mouse.v
 set_global_assignment -name SYSTEMVERILOG_FILE keyboard.sv

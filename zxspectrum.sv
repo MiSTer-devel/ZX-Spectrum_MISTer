@@ -116,7 +116,6 @@ localparam CONF_PLUS3 = "(+3) ";
 `include "build_id.v"
 localparam CONF_STR1 = {
 	"Spectrum;;",
-	"-;",
 	"S,TRDIMGDSKMGT,Load Disk;",
 	"-;",
 	"F,TAPCSWTZX,Load Tape;",
@@ -125,7 +124,10 @@ localparam CONF_STR1 = {
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
+	"O1,General Sound,Enabled,Disabled;",
 	"O23,Stereo mix,none,25%,50%,100%;",
+	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"OD,Port #FF,Timex,SAA1099;",
 	"OE,ULA+,Enabled,Disabled;",
@@ -359,18 +361,19 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel})
-		'b01XXXXXXXX: cpu_din = tape_dout;
-		'b00XXXXXXXX: cpu_din = ram_dout;
-		'b1X01XXXXXX: cpu_din = fdd_dout;
-		'b1X001XXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
-		'b1X0001XXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
-		'b1X00001XXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1X0000011X: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1X00000101: cpu_din = ulap_dout;
-		'b1X00000100: cpu_din = port_ff;
-		'b1X000000XX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
-		'b1X1XXXXXXX: cpu_din = 8'hFF;
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel, gs_sel})
+		'b01XXXXXXXXX: cpu_din = tape_dout;
+		'b00XXXXXXXXX: cpu_din = ram_dout;
+		'b1X01XXXXXXX: cpu_din = fdd_dout;
+		'b1X001XXXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
+		'b1X0001XXXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
+		'b1X00001XXXX: cpu_din = {page_scr_copy, 7'b1111111};
+		'b1X0000011XX: cpu_din = (addr[14] ? sound_data : 8'hFF);
+		'b1X00000101X: cpu_din = ulap_dout;
+		'b1X000001001: cpu_din = gs_dout;
+		'b1X000001000: cpu_din = port_ff;
+		'b1X000000XXX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
+		'b1X1XXXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
 
@@ -449,22 +452,22 @@ sdram ram
 );
 
 wire vram_we = (ram_addr[24:16] == 1) & ram_addr[14];
-vram vram
+dpram #(.ADDRWIDTH(15)) vram
 (
     .clock(clk_sys),
 
-    .wraddress({ram_addr[15], ram_addr[13:0]}),
-    .data(ram_din),
-    .wren(ram_we & vram_we),
+    .address_a({ram_addr[15], ram_addr[13:0]}),
+    .data_a(ram_din),
+    .wren_a(ram_we & vram_we),
 
-    .rdaddress(vram_addr),
-    .q(vram_dout)
+    .address_b(vram_addr),
+    .q_b(vram_dout)
 );
 
-(* maxfan = 10 *) reg	zx48;
-(* maxfan = 10 *) reg	p1024;
-(* maxfan = 10 *) reg	pf1024;
-(* maxfan = 10 *) reg	plus3;
+(* maxfan = 10 *) reg zx48;
+(* maxfan = 10 *) reg p1024;
+(* maxfan = 10 *) reg pf1024;
+(* maxfan = 10 *) reg plus3;
 reg        page_scr_copy;
 reg        shadow_rom;
 reg  [7:0] page_reg;
@@ -612,8 +615,30 @@ saa1099 saa1099
 	.out_r(saa_ch_r)
 );
 
-wire [11:0] audio_l = psg_ch_l + {2'b00, saa_ch_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
-wire [11:0] audio_r = psg_ch_r + {2'b00, saa_ch_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+wire [7:0] gs_dout;
+wire [14:0] gs_l, gs_r;
+
+// GS 352KB
+gs #(11) gs
+(
+	.RESET(aud_reset | status[1]),
+	.CLK(clk_sys),
+	.CE(ce_28m),
+	.A(addr),
+	.DI(cpu_dout),
+	.DO(gs_dout),
+	.WR_n(nWR),
+	.RD_n(nRD),
+	.IORQ_n(nIORQ),
+	.MUTE(status[1]),
+	.OUTL(gs_l),
+	.OUTR(gs_r)
+);
+
+wire gs_sel = (addr[7:4] == 'b1011 && addr[2:0] == 'b011) && ~status[1];
+
+wire [11:0] audio_l = psg_ch_l + {2'b00, saa_ch_l, 2'b00} + {2'b00, gs_l[14:5]} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+wire [11:0] audio_r = psg_ch_r + {2'b00, saa_ch_r, 2'b00} + {2'b00, gs_r[14:5]} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
 
 compressor compressor
 (
@@ -623,8 +648,8 @@ compressor compressor
 );
 
 ////////////////////   VIDEO   ///////////////////
-(* maxfan = 10 *) wire        ce_cpu_sn;
-(* maxfan = 10 *) wire        ce_cpu_sp;
+(* maxfan = 10 *) wire ce_cpu_sn;
+(* maxfan = 10 *) wire ce_cpu_sp;
 wire [14:0] vram_addr;
 wire  [7:0] vram_dout;
 wire  [7:0] port_ff;
