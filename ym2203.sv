@@ -25,7 +25,7 @@ module ym2203
 	input         CE_CPU,    // CPU Clock enable
 	input         CE_YM,     // YM2203 Master Clock enable x2 (due to YM2612 model!)
 
-	input         A0,        // 0 - register number, 1 - data
+	input         A0,        // 0 - register number/read FM, 1 - data/read PSG
 	input         WE,        // 0 - read , 1 - write
 	input   [7:0] DI,        // Data In
 	output  [7:0] DO,        // Data Out
@@ -41,13 +41,10 @@ module ym2203
 
 reg [7:0] ymreg;
 reg [1:0] pres;
-reg       psg_ena;
 
 always @(posedge CLK) begin
-	if(RESET) begin
-		pres    <= 3;
-		psg_ena <= 1;
-	end
+
+	if(RESET) pres <= 2;
 	else if(CE_CPU & WE) begin
 		if(FM_ENA) begin
 			if(~A0) ymreg  <= DI;
@@ -59,14 +56,13 @@ always @(posedge CLK) begin
 				endcase
 			end
 		end
-		if(~A0) psg_ena <= (~|DI[7:4]) | (~FM_ENA);
 	end
 end
 
-wire [2:0] opn_tbl[0:3] = '{1,1,5,2};
+wire [2:0] opn_tbl[4] = '{1,1,5,2};
 wire [2:0] opn_pres = opn_tbl[pres];
 
-wire [2:0] psg_tbl[0:3] = '{1,1,7,3};
+wire [2:0] psg_tbl[4] = '{0,0,3,1};
 wire [2:0] psg_pres = psg_tbl[pres];
 
 reg ce_psg_pre, ce_opn_pre;
@@ -97,7 +93,7 @@ ym2149 ym2149
 	.CLK(CLK),
 	.CE(ce_psg),
 	.RESET(RESET),
-	.BDIR(WE & (~A0 | psg_ena)),
+	.BDIR(WE),
 	.BC(~A0),
 	.DI(DI),
 	.DO(psg_dout),
@@ -119,8 +115,8 @@ jt12 jt12
 	.cpu_din(DI),
 	.cpu_dout(opn_dout),
 	.cpu_addr({1'b0,A0}),
-	.cpu_cs_n(1'b0),
-	.cpu_wr_n(~(WE & FM_ENA)),
+	.cpu_cs_n(~FM_ENA),
+	.cpu_wr_n(~WE),
 
 	.syn_clk(CLK & ce_opn),
 	.cpu_limiter_en(1'b1),

@@ -79,7 +79,7 @@ assign     IOB_out = ymreg[15];
 
 reg        ena_div;
 reg        ena_div_noise;
-reg [3:0]  addr;
+reg [7:0]  addr;
 reg [7:0]  ymreg[16];
 reg        env_ena;
 reg [4:0]  env_vol;
@@ -106,24 +106,27 @@ wire [7:0] volTableYm[32] =
 assign DO = dout;
 reg [7:0] dout;
 always_comb begin
-	case(addr)
-		 0: dout = ymreg[0];
-		 1: dout = {4'b0000, ymreg[1][3:0]};
-		 2: dout = ymreg[2];
-		 3: dout = {4'b0000, ymreg[3][3:0]};
-		 4: dout = ymreg[4];
-		 5: dout = {4'b0000, ymreg[5][3:0]};
-		 6: dout = {3'b000,  ymreg[6][4:0]};
-		 7: dout = ymreg[7];
-		 8: dout = {3'b000,  ymreg[8][4:0]};
-		 9: dout = {3'b000,  ymreg[9][4:0]};
-		10: dout = {3'b000,  ymreg[10][4:0]};
-		11: dout = ymreg[11];
-		12: dout = ymreg[12];
-		13: dout = {4'b0000, ymreg[13][3:0]};
-		14: dout = (ymreg[7][6] ? ymreg[14] : IOA_in);
-		15: dout = (ymreg[7][7] ? ymreg[15] : IOB_in);
-	endcase
+	if(addr[7:4]) dout <= 8'hFF;
+	else begin
+		case(addr[3:0])
+			 0: dout = ymreg[0];
+			 1: dout = ymreg[1][3:0];
+			 2: dout = ymreg[2];
+			 3: dout = ymreg[3][3:0];
+			 4: dout = ymreg[4];
+			 5: dout = ymreg[5][3:0];
+			 6: dout = ymreg[6][4:0];
+			 7: dout = ymreg[7];
+			 8: dout = ymreg[8][4:0];
+			 9: dout = ymreg[9][4:0];
+			10: dout = ymreg[10][4:0];
+			11: dout = ymreg[11];
+			12: dout = ymreg[12];
+			13: dout = ymreg[13][3:0];
+			14: dout = (ymreg[7][6] ? ymreg[14] : IOA_in);
+			15: dout = (ymreg[7][7] ? ymreg[15] : IOB_in);
+		endcase
+	end
 end
 
 //  p_divider
@@ -279,9 +282,9 @@ always @(posedge CLK) begin
 	end else begin
 		old_BDIR <= BDIR;
 		if(~old_BDIR & BDIR) begin
-			if(BC) addr <= DI[3:0];
-			else begin
-				ymreg[addr] <= DI;
+			if(BC) addr <= DI;
+			else if(!addr[7:4])begin
+				ymreg[addr[3:0]] <= DI;
 				env_reset <= (addr == 13);
 			end
 		end
