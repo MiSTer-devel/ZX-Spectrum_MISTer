@@ -1036,35 +1036,11 @@ begin
 
 -------------------------------------------------------------------------
 --
--- Syncronise inputs
---
--------------------------------------------------------------------------
-	process (RESET_n, CLK_n)
-		variable OldNMI_n : std_logic;
-	begin
-		if RESET_n = '0' then
-			BusReq_s <= '0';
-			NMI_s <= '0';
-			OldNMI_n := '0';
-		elsif rising_edge(CLK_n) then
-			if CEN = '1' then
-				BusReq_s <= not BUSRQ_n;
-				if NMICycle = '1' then
-					NMI_s <= '0';
-				elsif NMI_n = '0' and OldNMI_n = '1' then
-					NMI_s <= '1';
-				end if;
-				OldNMI_n := NMI_n;
-			end if;
-		end if;
-	end process;
-
--------------------------------------------------------------------------
---
 -- Main state machine
 --
 -------------------------------------------------------------------------
 	process (RESET_n, CLK_n)
+		variable OldNMI_n : std_logic;
 	begin
 		if RESET_n = '0' then
 			MCycle <= "001";
@@ -1080,9 +1056,17 @@ begin
 			Auto_Wait_t1 <= '0';
 			Auto_Wait_t2 <= '0';
 			M1_n <= '1';
+			BusReq_s <= '0';
+			NMI_s <= '0';
 		elsif rising_edge(CLK_n) then
 			
+			if NMI_n = '0' and OldNMI_n = '1' then
+				NMI_s <= '1';
+			end if;
+			OldNMI_n := NMI_n;
+
 			if CEN = '1' then
+				BusReq_s <= not BUSRQ_n;
 				Auto_Wait_t2 <= Auto_Wait_t1;
 				if T_Res = '1' then
 					Auto_Wait_t1 <= '0';
@@ -1140,6 +1124,7 @@ begin
 								IntCycle <= '0';
 								NMICycle <= '0';
 								if NMI_s = '1' and Prefix = "00" then
+									NMI_s    <= '0';
 									NMICycle <= '1';
 									IntE_FF1 <= '0';
 								elsif IntE_FF1 = '1' and INT_n='0' and Prefix = "00" and SetEI = '0' then
