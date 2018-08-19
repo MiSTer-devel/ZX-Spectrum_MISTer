@@ -5,12 +5,13 @@
   -----------------------------------------------------------------------------
    18.08.2018	Reworked first verilog version
    19.08.2018	Produce proper signed output
-  
+   20.08.2018	Use external SDR/DDR RAM for page 2 and up
+
    CPU: Z80 @ 28MHz
    ROM: 32K
-   RAM: 128KB+
+   RAM: up to 4096KB
    INT: 37.5KHz
-  
+
    #xxBB Command register - регистр команд, доступный для записи
    #xxBB Status register - регистр состояния, доступный для чтения
   		bit 7 флаг данных
@@ -65,7 +66,7 @@
 
 */
 
-module gs #(parameter PAGES=4, ROMFILE="gs105b.mif")
+module gs #(parameter ROMFILE="gs105b.mif")
 (
    input         RESET,
    input         CLK,
@@ -77,6 +78,13 @@ module gs #(parameter PAGES=4, ROMFILE="gs105b.mif")
    input         CS_n, 
    input         WR_n,
    input         RD_n,
+
+	output [21:0] MEM_ADDR,
+	output  [7:0] MEM_DI,
+	input   [7:0] MEM_DO,
+	output        MEM_RD,
+	output        MEM_WR,
+	input         MEM_WAIT,
 
    output [14:0] OUTL,
    output [14:0] OUTR
@@ -99,12 +107,8 @@ T80pa cpu
 (
 	.RESET_n(~RESET),
 	.CLK(CLK),
-	.CEN_p(CE),
-	.CEN_n(1),
-	.WAIT_n(1),
+	.CEN_p(CE & ~MEM_WAIT),
 	.INT_n(int_n),
-	.NMI_n(1),
-	.BUSRQ_n(1),
 	.M1_n(cpu_m1_n),
 	.MREQ_n(cpu_mreq_n),
 	.IORQ_n(cpu_iorq_n),
@@ -114,7 +118,6 @@ T80pa cpu
 	.DO(cpu_do_bus),
 	.DI(cpu_di_bus)
 );
-
 
 // INT#
 always @(posedge CLK) begin
@@ -165,7 +168,7 @@ always @(posedge CLK) begin
 	end
 end
 
-reg [3:0] port_00;
+reg [6:0] port_00;
 reg [7:0] port_03;
 reg signed [6:0] port_06, port_07, port_08, port_09;
 reg signed [7:0] ch_a, ch_b, ch_c, ch_d;
@@ -178,7 +181,7 @@ always @(posedge CLK) begin
 	else begin
 		if (~cpu_iorq_n & ~cpu_wr_n) begin
 			case(cpu_a_bus[3:0])
-				0: port_00 <= cpu_do_bus[3:0];
+				0: port_00 <= cpu_do_bus[6:0];
 				3: port_03 <= cpu_do_bus;
 				6: port_06 <= cpu_do_bus[5:0];
 				7: port_07 <= cpu_do_bus[5:0];
@@ -199,18 +202,29 @@ always @(posedge CLK) begin
 end
 
 wire [7:0] cpu_di_bus =
-	(~cpu_mreq_n) ? mem_do : 
-	(~cpu_iorq_n && cpu_a_bus[3:0] == 1) ? port_BB : 
-	(~cpu_iorq_n && cpu_a_bus[3:0] == 2) ? port_B3 : 
+	(~cpu_mreq_n && !page_addr[6:1]) ? mem_do  :
+	(~cpu_mreq_n)                        ? MEM_DO  :
+	(~cpu_iorq_n && cpu_a_bus[3:0] == 1) ? port_BB :
+	(~cpu_iorq_n && cpu_a_bus[3:0] == 2) ? port_B3 :
 	(~cpu_iorq_n && cpu_a_bus[3:0] == 4) ? {bit7, 6'b111111, bit0} : 
 	8'hFF;
 
+wire mem_wr = ~cpu_wr_n & ~cpu_mreq_n & |page_addr;
+wire mem_rd = ~cpu_rd_n & ~cpu_mreq_n;
+
+wire [6:0] page_addr = cpu_a_bus[15] ? port_00 : cpu_a_bus[14];
+
+assign MEM_ADDR = {page_addr, &cpu_a_bus[15:14], cpu_a_bus[13:0]};
+assign MEM_RD   = mem_rd && |page_addr[6:1];
+assign MEM_WR   = mem_wr && |page_addr[6:1];
+assign MEM_DI   = cpu_do_bus;
+
 wire [7:0] mem_do;
-dpram #(.ADDRWIDTH(19), .NUMWORDS((PAGES+1)*32768), .MEM_INIT_FILE(ROMFILE)) mem
+dpram #(.ADDRWIDTH(16), .MEM_INIT_FILE(ROMFILE)) mem
 (
 	.clock(CLK),
-	.address_a(cpu_a_bus[15] ? {port_00, cpu_a_bus[14:0]} : {3'b000, cpu_a_bus[14], 1'b0, cpu_a_bus[13:0]}),
-	.wren_a(~cpu_wr_n & ~cpu_mreq_n & (cpu_a_bus[15] ? |port_00 : cpu_a_bus[14])),
+	.address_a(MEM_ADDR[15:0]),
+	.wren_a(mem_wr && !page_addr[6:1]),
 	.data_a(cpu_do_bus),
 	.q_a(mem_do)
 );

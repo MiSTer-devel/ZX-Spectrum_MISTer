@@ -368,6 +368,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE compressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE u765.sv
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ddram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE video.sv
 set_global_assignment -name VERILOG_FILE dpram.v
 set_global_assignment -name SYSTEMVERILOG_FILE tape.sv

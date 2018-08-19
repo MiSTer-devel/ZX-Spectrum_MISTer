@@ -96,7 +96,6 @@ module emu
 	output        SDRAM_nWE
 );
 
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign AUDIO_S   = 1;
@@ -124,6 +123,8 @@ localparam CONF_STR1 = {
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"-;",
+	"OKL,General Sound,512KB,1MB,2MB,4MB;",
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
@@ -135,7 +136,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.89.",`BUILD_DATE
+	"V,v3.90.",`BUILD_DATE
 };
 
 
@@ -340,7 +341,6 @@ T80pa cpu
 	.CLK(clk_sys),
 	.CEN_p(ce_cpu_p),
 	.CEN_n(ce_cpu_n),
-	.WAIT_n(1),
 	.INT_n(nINT),
 	.NMI_n(~NMI),
 	.BUSRQ_n(nBUSRQ),
@@ -350,7 +350,6 @@ T80pa cpu
 	.RD_n(nRD),
 	.WR_n(nWR),
 	.RFSH_n(nRFSH),
-	.HALT_n(1),
 	.BUSAK_n(nBUSACK),
 	.A(addr),
 	.DO(cpu_dout),
@@ -616,8 +615,7 @@ saa1099 saa1099
 wire [7:0] gs_dout;
 wire [14:0] gs_l, gs_r;
 
-// GS 352KB
-gs #(11) gs
+gs gs
 (
 	.RESET(aud_reset),
 	.CLK(clk_sys),
@@ -630,8 +628,47 @@ gs #(11) gs
 	.WR_n(nWR),
 	.RD_n(nRD),
 
+	.MEM_ADDR(gs_mem_addr),
+	.MEM_DI(gs_mem_din),
+	.MEM_DO(gs_mem_dout | gs_mem_mask),
+	.MEM_RD(gs_mem_rd),
+	.MEM_WR(gs_mem_wr),
+	.MEM_WAIT(~gs_mem_ready),
+
 	.OUTL(gs_l),
 	.OUTR(gs_r)
+);
+
+assign DDRAM_CLK = clk_sys;
+
+wire [21:0] gs_mem_addr;
+wire  [7:0] gs_mem_dout;
+wire  [7:0] gs_mem_din;
+wire        gs_mem_rd;
+wire        gs_mem_wr;
+wire        gs_mem_ready;
+reg   [7:0] gs_mem_mask;
+
+always_comb begin
+	gs_mem_mask = 0;
+	case(status[21:20])
+		0: if(gs_mem_addr[21:19]) gs_mem_mask = 8'hFF;
+		1: if(gs_mem_addr[21:20]) gs_mem_mask = 8'hFF;
+		2: if(gs_mem_addr[21]   ) gs_mem_mask = 8'hFF;
+		3:                        gs_mem_mask = 0;
+	endcase
+end
+
+ddram ddram
+(
+	.*,
+
+	.addr(gs_mem_addr),
+	.dout(gs_mem_dout),
+	.din(gs_mem_din),
+	.we(gs_mem_wr),
+	.rd(gs_mem_rd),
+	.ready(gs_mem_ready)
 );
 
 wire gs_sel = (addr[7:0] ==? 'b1011?011);
