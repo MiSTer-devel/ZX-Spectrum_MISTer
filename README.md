@@ -17,12 +17,12 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
 - Joysticks: Kempston, Sinclair I/II, Cursor
-- Classic YM2149(AY8910)
+- General Sound with 512KB-4MB of RAM
 - Turbosound-FM (dual YM2203 incl. dual YM2149)
 - SAA1099
 
 ### Installation:
-Copy the *.rbf file at the root of the SD card.
+Copy the *.rbf and spectrum.rom files to the root of the SD card.
 
 ### Notes about supported formats:
 **TRD** is TR-DOS image used with Beta Disk Interface (BDI). To use TR-DOS you need to choose TRD image in OSD first. In 128K mode use menu to enter TR-DOS.
