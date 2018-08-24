@@ -17,7 +17,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
 - Joysticks: Kempston, Sinclair I/II, Cursor
-- General Sound with 512KB-4MB of RAM
+- General Sound with 512KB-2MB of RAM
 - Turbosound-FM (dual YM2203 incl. dual YM2149)
 - SAA1099
 

@@ -124,7 +124,7 @@ localparam CONF_STR1 = {
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OKL,General Sound,512KB,1MB,2MB,4MB;",
+	"OKL,General Sound,512KB,1MB,2MB;",
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
@@ -641,7 +641,7 @@ gs gs
 
 assign DDRAM_CLK = clk_sys;
 
-wire [21:0] gs_mem_addr;
+wire [20:0] gs_mem_addr;
 wire  [7:0] gs_mem_dout;
 wire  [7:0] gs_mem_din;
 wire        gs_mem_rd;
@@ -652,10 +652,9 @@ reg   [7:0] gs_mem_mask;
 always_comb begin
 	gs_mem_mask = 0;
 	case(status[21:20])
-		0: if(gs_mem_addr[21:19]) gs_mem_mask = 8'hFF;
-		1: if(gs_mem_addr[21:20]) gs_mem_mask = 8'hFF;
-		2: if(gs_mem_addr[21]   ) gs_mem_mask = 8'hFF;
-		3:                        gs_mem_mask = 0;
+		0: if(gs_mem_addr[20:19]) gs_mem_mask = 8'hFF;
+		1: if(gs_mem_addr[20])    gs_mem_mask = 8'hFF;
+	 2,3:                        gs_mem_mask = 0;
 	endcase
 end
 
