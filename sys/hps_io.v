@@ -79,6 +79,7 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 	output reg        ioctl_wr,
 	output reg [24:0] ioctl_addr,         // in WIDE mode address will be incremented by 2
 	output reg [DW:0] ioctl_dout,
+	output reg [31:0] ioctl_file_ext,
 	input             ioctl_wait,
 
 	// RTC MSM6242B layout
@@ -496,9 +497,11 @@ ps2_device mouse
 localparam UIO_FILE_TX      = 8'h53;
 localparam UIO_FILE_TX_DAT  = 8'h54;
 localparam UIO_FILE_INDEX   = 8'h55;
+localparam UIO_FILE_INFO    = 8'h56;
 
 always@(posedge clk_sys) begin
 	reg [15:0] cmd;
+	reg  [2:0] cnt;
 	reg        has_cmd;
 	reg [24:0] addr;
 	reg        wr;
@@ -513,9 +516,19 @@ always@(posedge clk_sys) begin
 			if(!has_cmd) begin
 				cmd <= io_din;
 				has_cmd <= 1;
+				cnt <= 0;
 			end else begin
 
 				case(cmd)
+					UIO_FILE_INFO:
+						if(~cnt[1]) begin
+							case(cnt)
+								0: ioctl_file_ext[31:16] <= io_din;
+								1: ioctl_file_ext[15:00] <= io_din;
+							endcase
+							cnt <= cnt + 1'd1;
+						end
+
 					UIO_FILE_INDEX:
 						begin
 							ioctl_index <= io_din[7:0];

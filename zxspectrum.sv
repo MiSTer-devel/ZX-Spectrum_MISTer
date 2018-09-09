@@ -286,6 +286,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.ps2_mouse(ps2_mouse),
 
 	// unused
+	.ioctl_file_ext(),
 	.joystick_analog_0(),
 	.joystick_analog_1(),
 	.RTC(),

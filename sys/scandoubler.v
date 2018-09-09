@@ -57,13 +57,12 @@ assign ce_pix_out = hq2x ? ce_x4 : ce_x2;
 
 //Compensate picture shift after HQ2x
 assign vb_out = vbo[2];
-assign hb_out = hq2x ? hbo[4] : hbo[2];
+assign hb_out = hbo[6];
 
 reg  [7:0] pix_len = 0;
 wire [7:0] pl = pix_len + 1'b1;
 
 reg ce_x1, ce_x4, ce_x2;
-reg req_line_reset;
 always @(negedge clk_sys) begin
 	reg old_ce;
 	reg [2:0] ce_cnt;
@@ -93,9 +92,6 @@ always @(negedge clk_sys) begin
 		ce_x2 <= 1;
 		ce_x4 <= 1;
 		pix_len <= 0;
-		req_line_reset <= 0;
-
-		if(hb_in) req_line_reset <= 1;
 	end
 end
 
@@ -109,13 +105,13 @@ Hq2x #(.LENGTH(LENGTH), .HALF_DEPTH(HALF_DEPTH)) Hq2x
 	.reset_frame(vs_in),
 	.reset_line(req_line_reset),
 	.read_y(sd_line),
-	.hblank(hbo[0]),
+	.hblank(hbo[0]&hbo[4]),
 	.outpixel({b_out,g_out,r_out})
 );
 
 reg  [1:0] sd_line;
 reg  [2:0] vbo;
-reg  [4:0] hbo;
+reg  [6:0] hbo;
 
 reg [DWIDTH:0] r_d;
 reg [DWIDTH:0] g_d;
@@ -123,6 +119,7 @@ reg [DWIDTH:0] b_d;
 
 reg [3:0] vso;
 
+reg req_line_reset;
 always @(posedge clk_sys) begin
 
 	reg [11:0] hs_max,hs_rise;
@@ -136,6 +133,8 @@ always @(posedge clk_sys) begin
 		hs <= hs_in;
 		hb <= hb_in;
 		
+		req_line_reset <= hb_in;
+
 		r_d <= r_in;
 		g_d <= g_in;
 		b_d <= b_in;
@@ -164,7 +163,7 @@ always @(posedge clk_sys) begin
 
 	if(ce_x4) begin
 		hs2 <= hs_in;
-		hbo[4:1] <= hbo[3:0];
+		hbo[6:1] <= hbo[5:0];
 
 		// output counter synchronous to input and at twice the rate
 		sd_hcnt <= sd_hcnt + 1'd1;
