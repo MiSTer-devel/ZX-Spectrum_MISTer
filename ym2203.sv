@@ -94,15 +94,13 @@ ym2149 ym2149
 	.CE(ce_psg),
 	.RESET(RESET),
 	.BDIR(WE),
-	.BC(~A0),
+	.BC(~A0 | ~WE),
 	.DI(DI),
 	.DO(psg_dout),
 	.CHANNEL_A(CHANNEL_A),
 	.CHANNEL_B(CHANNEL_B),
 	.CHANNEL_C(CHANNEL_C),
-	.ACTIVE(psg_active),
-	.SEL(1'b0),
-	.MODE(1'b0)
+	.ACTIVE(psg_active)
 );
 
 wire  [7:0] opn_dout;
