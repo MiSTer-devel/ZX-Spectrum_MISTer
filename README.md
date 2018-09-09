@@ -4,7 +4,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 
 ### Features:
 - Fully functional ZX Spectrum 48K, 128K, +3 and Pentagon 128 with correct CPU and Video timings.
-- Pentagon 512K and Profi 1024K memory interfaces.
+- Pentagon 1024K and Profi 1024K memory interfaces.
 - Turbo 7MHz, 14MHz, 28MHz, 56MHz.
 - ULA+ v1.1 programmable palettes with extended Timex control.
 - Timex HiColor, HiRes modes.
@@ -62,6 +62,7 @@ You can control CPU speed by following keys:
 - F7 - 28MHz
 - F8 - 56MHz
 - F9 - pause/continue
+Speed can be controlled from OSD as well.
 
 Due to SDRAM speed limitation 28MHz and 56MHz speeds include wait states, so effective CPU speed is lower than nominal.
 
@@ -102,6 +103,15 @@ When using the Spectrum +2A/3 mode, the Multiface 3 is supported. There's no Gen
 - F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted)
 - RShift+F11 - enter Multiface 128 menu
 - F12 - OSD menu
+
+Quick switch between models:
+- Alt+F1 - ZX Spectrum 48K (48KB, ULA-48)
+- Alt+F2 - ZX Spectrum 128K (128KB/+2, ULA-128)
+- Alt+F3 - ZX Spectrum +3 (128KB +3, ULA-128)
+- Alt+F4 - Pentagon 48K (48KB, Pentagon)
+- Alt+F5 - Pentagon 128K (128KB, Pentagon)
+- Alt+F6 - Pentagon 1024K (1024KB, Pentagon)
+CPU speed will reset to original.
 
 ### Download precompiled binaries and system ROMs:
 Go to [releases](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases) folder.

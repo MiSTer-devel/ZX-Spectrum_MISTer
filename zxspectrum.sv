@@ -209,19 +209,20 @@ always_comb begin
 end
 
 reg [2:0] speed_req;
+reg       speed_set;
 always @(posedge clk_sys) begin
 	reg [9:4] old_Fn;
 	old_Fn <= Fn[9:4];
 
 	if(reset) pause <= 0;
 
-	status_set <= 0;
+	speed_set <= 0;
 	if(!mod) begin
-		if(~old_Fn[4] & Fn[4]) {status_set,speed_req} <= 4'b1_000;
-		if(~old_Fn[5] & Fn[5]) {status_set,speed_req} <= 4'b1_001;
-		if(~old_Fn[6] & Fn[6]) {status_set,speed_req} <= 4'b1_010;
-		if(~old_Fn[7] & Fn[7]) {status_set,speed_req} <= 4'b1_011;
-		if(~old_Fn[8] & Fn[8]) {status_set,speed_req} <= 4'b1_100;
+		if(~old_Fn[4] & Fn[4]) {speed_set,speed_req} <= 4'b1_000;
+		if(~old_Fn[5] & Fn[5]) {speed_set,speed_req} <= 4'b1_001;
+		if(~old_Fn[6] & Fn[6]) {speed_set,speed_req} <= 4'b1_010;
+		if(~old_Fn[7] & Fn[7]) {speed_set,speed_req} <= 4'b1_011;
+		if(~old_Fn[8] & Fn[8]) {speed_set,speed_req} <= 4'b1_100;
 		if(~old_Fn[9] & Fn[9]) pause <= ~pause;
 	end
 end
@@ -305,8 +306,8 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
-	.status_set(status_set),
-	.status_in({status[31:25],speed_req,status[21:0]}),
+	.status_set(speed_set|arch_set),
+	.status_in(speed_set ? {status[31:25],speed_req,status[21:0]} : arch_status),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -351,7 +352,7 @@ wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
 wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10];
 
-wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset;
+wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
 wire        shdw_reset = (mod[2:1] == 3) & Fn[11] & ~plus3;
 
@@ -969,9 +970,9 @@ smart_tape tape
 	.ce(ce_tape),
 
 	.turbo(tape_turbo),
-	.pause(Fn[1]),
-	.prev(Fn[2]),
-	.next(Fn[3]),
+	.pause(Fn[1] & !mod),
+	.prev(Fn[2] & !mod),
+	.next(Fn[3] & !mod),
 	.audio_out(tape_vin),
 	.led(tape_led),
 	.active(tape_active),
@@ -1011,5 +1012,36 @@ end
 
 assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
 
+//////////////////  ARCH SET  //////////////////
+
+reg        arch_set = 0;
+reg [31:0] arch_status;
+reg        arch_reset = 0;
+always @(posedge clk_sys) begin
+	reg [7:0] timeout = 0;
+	reg [6:1] old_Fn;
+	reg       setwait = 0;
+
+	arch_set <= 0;
+	old_Fn <= Fn[6:1];
+	if(mod == 2 && (old_Fn != Fn[6:1])) begin
+		{arch_status[31:13],arch_status[7:0]} <= {status[31:25],3'b000,status[21:13],status[7:0]};
+		if(~old_Fn[1] & Fn[1]) {setwait,arch_set,arch_status[12:8]} <= 'b11_011_00; // Alt+F1 - ZX 48
+		if(~old_Fn[2] & Fn[2]) {setwait,arch_set,arch_status[12:8]} <= 'b11_000_01; // Alt+F2 - ZX 128/+2
+		if(~old_Fn[3] & Fn[3]) {setwait,arch_set,arch_status[12:8]} <= 'b11_100_01; // Alt+F3 - ZX 128 +3
+		if(~old_Fn[4] & Fn[4]) {setwait,arch_set,arch_status[12:8]} <= 'b11_011_10; // Alt+F4 - Pentagon 48
+		if(~old_Fn[5] & Fn[5]) {setwait,arch_set,arch_status[12:8]} <= 'b11_000_10; // Alt+F5 - Pentagon 128
+		if(~old_Fn[6] & Fn[6]) {setwait,arch_set,arch_status[12:8]} <= 'b11_001_10; // Alt+F6 - Pentagon 1024
+	end
+
+	if(timeout) timeout <= timeout - 1'd1;
+	else arch_reset <= 0;
+
+	if(setwait && (status[12:8] == arch_status[12:8])) begin
+		timeout <= '1;
+		arch_reset <= 1;
+		setwait <= 0;
+	end
+end
 
 endmodule
