@@ -56,33 +56,35 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
-use work.T80_Pack.all;
 
 entity T80pa is
 	generic(
 		Mode : integer := 0	-- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
 	);
 	port(
-		RESET_n		: in  std_logic;
-		CLK			: in  std_logic;
+		RESET_n     : in  std_logic;
+		CLK	        : in  std_logic;
 		CEN_p       : in  std_logic := '1';
 		CEN_n       : in  std_logic := '1';
-		WAIT_n		: in  std_logic := '1';
-		INT_n			: in  std_logic := '1';
-		NMI_n			: in  std_logic := '1';
-		BUSRQ_n		: in  std_logic := '1';
-		M1_n			: out std_logic;
-		MREQ_n		: out std_logic;
-		IORQ_n		: out std_logic;
-		RD_n			: out std_logic;
-		WR_n			: out std_logic;
-		RFSH_n		: out std_logic;
-		HALT_n		: out std_logic;
-		BUSAK_n		: out std_logic;
-		A				: out std_logic_vector(15 downto 0);
-		DI				: in  std_logic_vector(7 downto 0);
-		DO				: out std_logic_vector(7 downto 0);
-		REG			: out std_logic_vector(207 downto 0) -- IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		WAIT_n      : in  std_logic := '1';
+		INT_n       : in  std_logic := '1';
+		NMI_n       : in  std_logic := '1';
+		BUSRQ_n     : in  std_logic := '1';
+		M1_n        : out std_logic;
+		MREQ_n      : out std_logic;
+		IORQ_n      : out std_logic;
+		RD_n        : out std_logic;
+		WR_n        : out std_logic;
+		RFSH_n      : out std_logic;
+		HALT_n      : out std_logic;
+		BUSAK_n     : out std_logic;
+		OUT0        : in  std_logic := '0';  -- 0 => OUT(C),0, 1 => OUT(C),255
+		A           : out std_logic_vector(15 downto 0);
+		DI          : in  std_logic_vector(7 downto 0);
+		DO          : out std_logic_vector(7 downto 0);
+		REG         : out std_logic_vector(211 downto 0); -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+		DIRSet      : in  std_logic := '0';
+		DIR         : in  std_logic_vector(211 downto 0) := (others => '0') -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 	);
 end T80pa;
 
@@ -107,7 +109,7 @@ begin
 
 	BUSAK_n <= BUSAK;
 
-	u0 : T80
+	u0 : work.T80
 		generic map(
 			Mode    => Mode,
 			IOWait  => 1
@@ -134,7 +136,10 @@ begin
 			REG     => REG,
 			MC      => MCycle,
 			TS      => TState,
-			IntCycle_n => IntCycle_n
+			OUT0    => OUT0,
+			IntCycle_n => IntCycle_n,
+			DIRSet  => DIRSet,
+			DIR     => DIR
 		);
 
 	process(CLK)

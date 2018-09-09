@@ -74,7 +74,6 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
-use work.T80_Pack.all;
 
 entity T80_MCode is
 	generic(
@@ -807,13 +806,11 @@ begin
 					Set_Addr_To <= aSP;
 					Set_BusB_To <= "1101";
 				when 2 =>
-					TStates <= "100";
 					Write <= '1';
 					IncDec_16 <= "1111";
 					Set_Addr_To <= aSP;
 					Set_BusB_To <= "1100";
 				when 3 =>
-					TStates <= "100";
 					Write <= '1';
 				when others => null;
 				end case;

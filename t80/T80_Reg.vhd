@@ -89,7 +89,9 @@ entity T80_Reg is
 		DOBL    : out std_logic_vector(7 downto 0);
 		DOCH    : out std_logic_vector(7 downto 0);
 		DOCL    : out std_logic_vector(7 downto 0);
-		DOR     : out std_logic_vector(127 downto 0)
+		DOR     : out std_logic_vector(127 downto 0);
+		DIRSet  : in  std_logic;
+		DIR     : in  std_logic_vector(127 downto 0)
 	);
 end T80_Reg;
 
@@ -104,7 +106,31 @@ begin
 	process (Clk)
 	begin
 		if rising_edge(Clk) then
-			if CEN = '1' then
+			if DIRSet = '1' then
+				RegsL(0) <= DIR(  7 downto   0);
+				RegsH(0) <= DIR( 15 downto   8);
+
+				RegsL(1) <= DIR( 23 downto  16);
+				RegsH(1) <= DIR( 31 downto  24);
+
+				RegsL(2) <= DIR( 39 downto  32);
+				RegsH(2) <= DIR( 47 downto  40);
+
+				RegsL(3) <= DIR( 55 downto  48);
+				RegsH(3) <= DIR( 63 downto  56);
+
+				RegsL(4) <= DIR( 71 downto  64);
+				RegsH(4) <= DIR( 79 downto  72);
+
+				RegsL(5) <= DIR( 87 downto  80);
+				RegsH(5) <= DIR( 95 downto  88);
+
+				RegsL(6) <= DIR(103 downto  96);
+				RegsH(6) <= DIR(111 downto 104);
+
+				RegsL(7) <= DIR(119 downto 112);
+				RegsH(7) <= DIR(127 downto 120);
+			elsif CEN = '1' then
 				if WEH = '1' then
 					RegsH(to_integer(unsigned(AddrA))) <= DIH;
 				end if;
