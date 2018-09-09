@@ -128,6 +128,7 @@ localparam CONF_STR1 = {
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
+	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
 	"OD,Port #FF,Timex,SAA1099;",
 	"OE,ULA+,Enabled,Disabled;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
@@ -194,24 +195,38 @@ always @(negedge clk_sys) begin
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
 end
 
-reg [4:0] turbo = 5'b11111, turbo_key = 5'b11111;
+
+wire [4:0] turbo_req;
+always_comb begin
+	casex({tape_active & ~status[6], status[24:22]})
+		 'b1XXX: turbo_req = 5'b00001;
+		 'b0001: turbo_req = 5'b01111;
+		 'b0010: turbo_req = 5'b00111;
+		 'b0011: turbo_req = 5'b00011;
+		 'b0100: turbo_req = 5'b00001;
+		default: turbo_req = 5'b11111;
+	endcase
+end
+
+reg [2:0] speed_req;
 always @(posedge clk_sys) begin
 	reg [9:4] old_Fn;
 	old_Fn <= Fn[9:4];
 
 	if(reset) pause <= 0;
 
+	status_set <= 0;
 	if(!mod) begin
-		if(~old_Fn[4] & Fn[4]) turbo_key <= 5'b11111;
-		if(~old_Fn[5] & Fn[5]) turbo_key <= 5'b01111;
-		if(~old_Fn[6] & Fn[6]) turbo_key <= 5'b00111;
-		if(~old_Fn[7] & Fn[7]) turbo_key <= 5'b00011;
-		if(~old_Fn[8] & Fn[8]) turbo_key <= 5'b00001;
+		if(~old_Fn[4] & Fn[4]) {status_set,speed_req} <= 4'b1_000;
+		if(~old_Fn[5] & Fn[5]) {status_set,speed_req} <= 4'b1_001;
+		if(~old_Fn[6] & Fn[6]) {status_set,speed_req} <= 4'b1_010;
+		if(~old_Fn[7] & Fn[7]) {status_set,speed_req} <= 4'b1_011;
+		if(~old_Fn[8] & Fn[8]) {status_set,speed_req} <= 4'b1_100;
 		if(~old_Fn[9] & Fn[9]) pause <= ~pause;
 	end
 end
 
-wire [4:0] turbo_req = (tape_active & ~status[6]) ? 5'b00001 : turbo_key;
+reg [4:0] turbo = 5'b11111;
 always @(posedge clk_sys) begin
 	reg [1:0] timeout;
 
@@ -272,33 +287,45 @@ wire  [7:0] ioctl_dout;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 
+reg         status_set;
+reg  [31:0] status_out;
+
 hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 (
-	.*,
+	.clk_sys(clk_sys),
+	.HPS_BUS(HPS_BUS),
+
 	.conf_str({CONF_STR1, need_apply ? "R" : "+", CONF_STR2, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
-	.sd_conf(0),
-	.ioctl_wait(0),
-	.sd_ack_conf(),
 
 	.ps2_key(ps2_key),
-	.ps2_kbd_led_use(0),
-	.ps2_kbd_led_status(0),
 	.ps2_mouse(ps2_mouse),
 
-	// unused
-	.ioctl_file_ext(),
-	.joystick_analog_0(),
-	.joystick_analog_1(),
-	.RTC(),
-	.TIMESTAMP(),
-	.ps2_kbd_clk_out(),
-	.ps2_kbd_data_out(),
-	.ps2_mouse_clk_out(),
-	.ps2_mouse_data_out(),
-	.ps2_kbd_clk_in(1),
-	.ps2_kbd_data_in(1),
-	.ps2_mouse_clk_in(1),
-	.ps2_mouse_data_in(1)
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1),
+	.buttons(buttons),
+	.forced_scandoubler(forced_scandoubler),
+	.status(status),
+	.status_set(status_set),
+	.status_in({status[31:25],speed_req,status[21:0]}),
+
+	.sd_lba(sd_lba),
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din),
+	.sd_buff_wr(sd_buff_wr),
+	.img_mounted(img_mounted),
+	.img_size(img_size),
+	.img_readonly(img_readonly),
+
+	.ioctl_wr(ioctl_wr),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_dout(ioctl_dout),
+	.ioctl_download(ioctl_download),
+	.ioctl_index(ioctl_index),
+	.ioctl_wait(0)
 );
 
 reg  [2:0] cur_mode = 0;
