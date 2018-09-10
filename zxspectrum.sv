@@ -580,7 +580,7 @@ always @(posedge clk_sys) begin
 				if(page_write) begin
 					page_reg  <= cpu_dout;
 					if(p1024 & ~page_reg_p1024[2]) page_128k[2:0] <= { cpu_dout[5], cpu_dout[7:6] };
-					if(~plusd_mem) page_scr_copy <= page_reg[3];
+					if(~plusd_mem) page_scr_copy <= cpu_dout[3];
 				end else if (page_write_plus3) begin
 					page_reg_plus3 <= cpu_dout; 
 				end
