@@ -108,6 +108,13 @@ assign LED_POWER = 0;
 assign VIDEO_ARX = status[5:4] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[5:4] ? 8'd9  : 8'd3;
 
+localparam ARCH_ZX48  = 5'b011_00; // ZX 48
+localparam ARCH_ZX128 = 5'b000_01; // ZX 128/+2
+localparam ARCH_ZX3   = 5'b100_01; // ZX 128 +3
+localparam ARCH_P48   = 5'b011_10; // Pentagon 48
+localparam ARCH_P128  = 5'b000_10; // Pentagon 128
+localparam ARCH_P1024 = 5'b001_10; // Pentagon 1024
+
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
 localparam CONF_PLUS3 = "(+3) ";
@@ -307,7 +314,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
 	.status_set(speed_set|arch_set),
-	.status_in(speed_set ? {status[31:25],speed_req,status[21:0]} : arch_status),
+	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -1015,7 +1022,7 @@ assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
 //////////////////  ARCH SET  //////////////////
 
 reg        arch_set = 0;
-reg [31:0] arch_status;
+reg [4:0] arch;
 reg        arch_reset = 0;
 always @(posedge clk_sys) begin
 	reg [7:0] timeout = 0;
@@ -1025,19 +1032,18 @@ always @(posedge clk_sys) begin
 	arch_set <= 0;
 	old_Fn <= Fn[6:1];
 	if(mod == 2 && (old_Fn != Fn[6:1])) begin
-		{arch_status[31:13],arch_status[7:0]} <= {status[31:25],3'b000,status[21:13],status[7:0]};
-		if(~old_Fn[1] & Fn[1]) {setwait,arch_set,arch_status[12:8]} <= 'b11_011_00; // Alt+F1 - ZX 48
-		if(~old_Fn[2] & Fn[2]) {setwait,arch_set,arch_status[12:8]} <= 'b11_000_01; // Alt+F2 - ZX 128/+2
-		if(~old_Fn[3] & Fn[3]) {setwait,arch_set,arch_status[12:8]} <= 'b11_100_01; // Alt+F3 - ZX 128 +3
-		if(~old_Fn[4] & Fn[4]) {setwait,arch_set,arch_status[12:8]} <= 'b11_011_10; // Alt+F4 - Pentagon 48
-		if(~old_Fn[5] & Fn[5]) {setwait,arch_set,arch_status[12:8]} <= 'b11_000_10; // Alt+F5 - Pentagon 128
-		if(~old_Fn[6] & Fn[6]) {setwait,arch_set,arch_status[12:8]} <= 'b11_001_10; // Alt+F6 - Pentagon 1024
+		if(~old_Fn[1] & Fn[1]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX48 }; // Alt+F1 - ZX 48
+		if(~old_Fn[2] & Fn[2]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX128}; // Alt+F2 - ZX 128/+2
+		if(~old_Fn[3] & Fn[3]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX3  }; // Alt+F3 - ZX 128 +3
+		if(~old_Fn[4] & Fn[4]) {setwait,arch_set,arch} <= {2'b11,ARCH_P48  }; // Alt+F4 - Pentagon 48
+		if(~old_Fn[5] & Fn[5]) {setwait,arch_set,arch} <= {2'b11,ARCH_P128 }; // Alt+F5 - Pentagon 128
+		if(~old_Fn[6] & Fn[6]) {setwait,arch_set,arch} <= {2'b11,ARCH_P1024}; // Alt+F6 - Pentagon 1024
 	end
 
 	if(timeout) timeout <= timeout - 1'd1;
 	else arch_reset <= 0;
 
-	if(setwait && (status[12:8] == arch_status[12:8])) begin
+	if(setwait && (status[12:8] == arch)) begin
 		timeout <= '1;
 		arch_reset <= 1;
 		setwait <= 0;

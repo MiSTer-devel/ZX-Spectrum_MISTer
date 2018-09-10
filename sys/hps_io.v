@@ -268,8 +268,10 @@ always@(posedge clk_sys) begin
 	reg        ps2skip = 0;
 	reg  [3:0] stflg = 0;
 	reg [31:0] status_req;
+	reg        old_status_set = 0;
 
-	if(status_set) begin
+	old_status_set <= status_set;
+	if(~old_status_set & status_set) begin
 		stflg <= stflg + 1'd1;
 		status_req <= status_in;
 	end
