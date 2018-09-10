@@ -10,6 +10,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - Timex HiColor, HiRes modes.
 - TAP tape format with turbo (direct byte injection) and normal loading.
 - TZX and CSW tape formats with fast(16x) and normal loading.
+- Z80 snapshot loading.
 - TR-DOS (Beta Disk Interface) - TRD(read/write) and SCL(read-only) images.
 - G+DOS (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
 - +3 Disk drive usable with +3DOS.
