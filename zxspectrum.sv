@@ -127,6 +127,8 @@ localparam CONF_STR1 = {
 	"F,TAPCSWTZX,Load Tape;",
 	"O6,Fast tape load,On,Off;",
 	"-;",
+	"F,Z80,Load Snapshot;",
+	"-;",
 	"O89,Video timings,ULA-48,ULA-128,Pentagon;",
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -144,7 +146,7 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.90.",`BUILD_DATE
+	"V,v3.91.",`BUILD_DATE
 };
 
 
@@ -294,6 +296,7 @@ wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
+wire        ioctl_wait;
 
 reg         status_set;
 reg  [31:0] status_out;
@@ -313,8 +316,8 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
-	.status_set(speed_set|arch_set),
-	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : status[12:8], status[7:0]}),
+	.status_set(speed_set|arch_set|snap_hwset),
+	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -333,7 +336,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.ioctl_dout(ioctl_dout),
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
-	.ioctl_wait(0)
+	.ioctl_wait(ioctl_wait)
 );
 
 reg  [2:0] cur_mode = 0;
@@ -359,7 +362,7 @@ wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
 wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10];
 
-wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset;
+wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset | snap_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
 wire        shdw_reset = (mod[2:1] == 3) & Fn[11] & ~plus3;
 
@@ -390,7 +393,9 @@ T80pa cpu
 	.A(addr),
 	.DO(cpu_dout),
 	.DI(cpu_din),
-	.REG(cpu_reg)
+	.REG(cpu_reg),
+	.DIR(snap_REG),
+	.DIRSet(snap_REGSet)
 );
 
 always_comb begin
@@ -438,23 +443,25 @@ wire  [7:0] ram_dout;
 wire        ram_ready;
 
 always_comb begin
-	casex({dma, tape_req, page_special, addr[15:14]})
-		'b1X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
-		'b01_X_XX: ram_addr = tape_addr;
-		'b00_0_00: ram_addr = { 3'b101, page_rom,    addr[13:0]}; //ROM
-		'b00_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
-		'b00_0_10: ram_addr = {        3'd2,         addr[13:0]};
-		'b00_0_11: ram_addr = {    page_ram,         addr[13:0]};
-		'b00_1_00: ram_addr = { |page_reg_plus3[2:1],                      2'b00, addr[13:0]}; //Special page modes
-		'b00_1_01: ram_addr = { |page_reg_plus3[2:1], &page_reg_plus3[2:1], 1'b1, addr[13:0]};
-		'b00_1_10: ram_addr = { |page_reg_plus3[2:1],                      2'b10, addr[13:0]};
-		'b00_1_11: ram_addr = { ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
+	casex({snap_reset, dma, tape_req, page_special, addr[15:14]})
+		'b1XX_X_XX: ram_addr = snap_addr;
+		'b01X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
+		'b001_X_XX: ram_addr = tape_addr;
+		'b000_0_00: ram_addr = { 3'b101, page_rom,    addr[13:0]}; //ROM
+		'b000_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
+		'b000_0_10: ram_addr = {        3'd2,         addr[13:0]};
+		'b000_0_11: ram_addr = {    page_ram,         addr[13:0]};
+		'b000_1_00: ram_addr = { |page_reg_plus3[2:1],                      2'b00, addr[13:0]}; //Special page modes
+		'b000_1_01: ram_addr = { |page_reg_plus3[2:1], &page_reg_plus3[2:1], 1'b1, addr[13:0]};
+		'b000_1_10: ram_addr = { |page_reg_plus3[2:1],                      2'b10, addr[13:0]};
+		'b000_1_11: ram_addr = { ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
 	endcase
 
-	casex({dma, tape_req})
-		'b1X: ram_din = ioctl_dout;
-		'b01: ram_din = 0;
-		'b00: ram_din = cpu_dout;
+	casex({snap_reset, dma, tape_req})
+		'b1XX: ram_din = snap_data;
+		'b01X: ram_din = ioctl_dout;
+		'b001: ram_din = 0;
+		'b000: ram_din = cpu_dout;
 	endcase
 
 	casex({dma, tape_req})
@@ -463,10 +470,11 @@ always_comb begin
 		'b00: ram_rd = ~nMREQ & ~nRD;
 	endcase
 
-	casex({dma, tape_req})
-		'b1X: ram_we = ioctl_wr;
-		'b01: ram_we = 0;
-		'b00: ram_we = (page_special | addr[15] | addr[14] | ((plusd_mem | mf128_mem) & addr[13])) & ~nMREQ & ~nWR;
+	casex({snap_reset, dma, tape_req})
+		'b1XX: ram_we = snap_wr;
+		'b01X: ram_we = ioctl_wr;
+		'b001: ram_we = 0;
+		'b000: ram_we = (page_special | addr[15] | addr[14] | ((plusd_mem | mf128_mem) & addr[13])) & ~nMREQ & ~nWR;
 	endcase
 end
 
@@ -560,19 +568,25 @@ always @(posedge clk_sys) begin
 			plus3 <= (status[12:10] == 4);
 		end
 	end else begin
-		if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
-		if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3) shadow_rom <= 1; 
+		if(snap_REGSet) begin
+			if((snap_hw == ARCH_ZX128) || (snap_hw == ARCH_P128) || (snap_hw == ARCH_ZX3)) page_reg <= snap_7ffd;
+			if(snap_hw == ARCH_ZX3) page_reg_plus3 <= snap_1ffd;
+		end
+		else begin
+			if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
+			if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3) shadow_rom <= 1; 
 
-		if(io_wr & ~old_wr) begin
-			if(page_write) begin
-				page_reg  <= cpu_dout;
-				if(p1024 & ~page_reg_p1024[2])	page_128k[2:0] <= { cpu_dout[5], cpu_dout[7:6] };
-				if(~plusd_mem) page_scr_copy <= page_reg[3];
-			end else if (page_write_plus3) begin
-				page_reg_plus3 <= cpu_dout; 
+			if(io_wr & ~old_wr) begin
+				if(page_write) begin
+					page_reg  <= cpu_dout;
+					if(p1024 & ~page_reg_p1024[2]) page_128k[2:0] <= { cpu_dout[5], cpu_dout[7:6] };
+					if(~plusd_mem) page_scr_copy <= page_reg[3];
+				end else if (page_write_plus3) begin
+					page_reg_plus3 <= cpu_dout; 
+				end
+				if(pf1024 & (addr == 'hDFFD)) page_128k <= cpu_dout[2:0];
+				if(p1024 & page_p1024) page_reg_p1024 <= cpu_dout;
 			end
-			if(pf1024 & (addr == 'hDFFD)) page_128k <= cpu_dout[2:0];
-			if(p1024 & page_p1024) page_reg_p1024 <= cpu_dout;
 		end
 	end
 end
@@ -594,6 +608,8 @@ always @(posedge clk_sys) begin
 		ear_out <= cpu_dout[4]; 
 		mic_out <= cpu_dout[3];
 	end
+	
+	if(snap_REGSet) border_color <= snap_border;
 end
 
 
@@ -1021,9 +1037,9 @@ assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
 
 //////////////////  ARCH SET  //////////////////
 
-reg        arch_set = 0;
+reg       arch_set = 0;
 reg [4:0] arch;
-reg        arch_reset = 0;
+reg       arch_reset = 0;
 always @(posedge clk_sys) begin
 	reg [7:0] timeout = 0;
 	reg [6:1] old_Fn;
@@ -1049,5 +1065,50 @@ always @(posedge clk_sys) begin
 		setwait <= 0;
 	end
 end
+
+
+//////////////////  SNAPSHOT  //////////////////
+
+wire [211:0] snap_REG;
+wire         snap_REGSet;
+wire  [24:0] snap_addr;
+wire   [7:0] snap_data;
+wire         snap_wr;
+wire         snap_reset;
+wire         snap_hwset;
+wire   [4:0] snap_hw;
+wire  [31:0] snap_status;
+wire   [2:0] snap_border;
+wire   [7:0] snap_1ffd;
+wire   [7:0] snap_7ffd;
+
+snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128) snap_loader
+(
+	.clk_sys(clk_sys),
+
+	.ioctl_download(ioctl_download && ioctl_index == 4),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_data(ioctl_dout),
+	.ioctl_wr(ioctl_wr),
+	.ioctl_wait(ioctl_wait),
+
+	.ram_ready(ram_ready),
+
+	.REG(snap_REG),
+	.REGSet(snap_REGSet),
+
+	.addr(snap_addr),
+	.dout(snap_data),
+	.wr(snap_wr),
+
+   .reset(snap_reset),
+   .hwset(snap_hwset),
+   .hw(snap_hw),
+   .hw_ack(status[12:8]),
+
+   .border(snap_border),
+   .reg_1ffd(snap_1ffd),
+   .reg_7ffd(snap_7ffd)
+);
 
 endmodule
