@@ -133,7 +133,7 @@ localparam CONF_STR1 = {
 	"O45,Aspect ratio,Original,Wide,Zoom;",
 	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"OKL,General Sound,512KB,1MB,2MB;",
+	"OKL,General Sound,512KB,1MB,2MB,Disabled;",
 	"O23,Stereo mix,none,25%,50%,100%;",
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
@@ -399,18 +399,18 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, addr[0], psg_enable, ulap_sel, gs_sel})
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
 		'b01XXXXXXXXX: cpu_din = tape_dout;
 		'b00XXXXXXXXX: cpu_din = ram_dout;
 		'b1X01XXXXXXX: cpu_din = fdd_dout;
 		'b1X001XXXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
 		'b1X0001XXXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
 		'b1X00001XXXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1X0000011XX: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1X00000101X: cpu_din = ulap_dout;
-		'b1X000001001: cpu_din = gs_dout;
-		'b1X000001000: cpu_din = port_ff;
-		'b1X000000XXX: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
+		'b1X000001XXX: cpu_din = gs_dout;
+		'b1X0000001XX: cpu_din = (addr[14] ? sound_data : 8'hFF);
+		'b1X00000001X: cpu_din = ulap_dout;
+		'b1X000000001: cpu_din = port_ff;
+		'b1X000000000: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
 		'b1X1XXXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
@@ -722,7 +722,7 @@ ddram ddram
 	.ready(gs_mem_ready)
 );
 
-wire gs_sel = (addr[7:0] ==? 'b1011?011);
+wire gs_sel = (addr[7:0] ==? 'b1011?011) & ~&status[21:20];
 
 wire [11:0] audio_l = ts_l + {{3{gs_l[14]}}, gs_l[13:5]} + {2'b00, saa_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
 wire [11:0] audio_r = ts_r + {{3{gs_r[14]}}, gs_r[13:5]} + {2'b00, saa_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};

@@ -273,7 +273,7 @@ end
 /////////////////  ULA+, Timex  ///////////////////
 
 assign     ulap_dout = ulap_group ? {ulap_mono, ulap_ena} : palette[pal_addr];
-assign     ulap_sel  = ulap_acc & addr[14];
+assign     ulap_sel  = ulap_acc & addr[14] & ulap_tmx_ena[0];
 
 wire       ulap_acc = ({addr[15], 1'b0, addr[13:0]} == 'hBF3B);
 wire       io_wr = ~nIORQ & ~nWR;
