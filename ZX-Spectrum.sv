@@ -47,6 +47,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output  [1:0] VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -93,9 +95,18 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR
 );
 
+assign VGA_F1 = 0;
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign AUDIO_S   = 1;
@@ -146,16 +157,14 @@ localparam CONF_STR1 = {
 localparam CONF_STR2 = {
 	"0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
-	"V,v3.91.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 
 ////////////////////   CLOCKS   ///////////////////
 
-assign CLK_VIDEO = clk_sys;
-
 wire locked;
-wire clk_sys;
+wire clk_sys, clk_vid;
 
 pll pll
 (
@@ -163,6 +172,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
+	.outclk_2(clk_vid),
 	.locked(locked)
 );
 
@@ -753,7 +763,54 @@ always_comb begin
 	endcase
 end
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]), .wide(status[5]));
+wire [1:0] scale = status[16:15];
+assign VGA_SL = {scale == 3, scale == 2};
+
+video video
+(
+	.*,
+	.ce_pix(ce_vid1),
+
+	.VGA_R(r2),
+	.VGA_G(g2),
+	.VGA_B(b2),
+	.VGA_HS(hs2),
+	.VGA_VS(vs2),
+	.VGA_DE(de2),
+
+	.din(cpu_dout),
+	.page_ram(page_ram[2:0]),
+	.scale(scale == 1),
+	.forced_scandoubler(forced_scandoubler || scale),
+	.wide(status[5])
+);
+
+wire ce_vid1;
+reg  ce_vid2;
+always @(posedge clk_sys) ce_vid2 <= ce_vid1;
+
+wire ce_vid = ce_vid2 | ce_vid1;
+
+reg       ce_pix, ce_pix1;
+reg [7:0] r,r1,r2,g,g1,g2,b,b1,b2;
+reg       hs,hs1,hs2,vs,vs1,vs2,de,de1,de2;
+
+always @(posedge clk_vid) begin
+	ce_pix1 <= ce_vid;
+	ce_pix <= ce_pix1;
+
+	{r1,g1,b1} <= {r2,g2,b2};
+	{r,g,b} <= {r1,g1,b1};
+	
+	{hs1,vs1,de1} <= {hs2,vs2,de2};
+	{hs,vs,de} <= {hs1,vs1,de1};
+end
+
+assign {VGA_R,VGA_G,VGA_B} = {r,g,b};
+assign {VGA_HS,VGA_VS,VGA_DE} = {hs,vs,de};
+assign CE_PIXEL = ce_pix;
+assign CLK_VIDEO = clk_vid;
+
 
 reg new_vmode = 0;
 always @(posedge clk_sys) begin
