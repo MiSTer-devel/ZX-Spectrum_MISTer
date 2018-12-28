@@ -186,7 +186,7 @@ reg  pause;
 reg  cpu_en = 1;
 reg  ce_cpu_tp;
 reg  ce_cpu_tn;
-reg  ce_tape, ce_tsound, ce_wd1793, ce_u765;
+reg  ce_tape, ce_wd1793, ce_u765;
 
 wire ce_cpu_p = cpu_en & cpu_p;
 wire ce_cpu_n = cpu_en & cpu_n;
@@ -207,7 +207,6 @@ always @(negedge clk_sys) begin
 	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
 	ce_tape   <= !(counter & turbo) & cpu_en;
-	ce_tsound <= !(counter & turbo) & cpu_en;
 	ce_wd1793 <= !(counter & turbo) & cpu_en;
 	ce_u765   <= !(counter & turbo) & cpu_en;
 
@@ -638,8 +637,7 @@ turbosound turbosound
 (
 	.RESET(aud_reset),
 	.CLK(clk_sys),
-	.CE_CPU(ce_tsound),
-	.CE_YM(ce_ym),
+	.CE(ce_ym),
 	.BDIR(psg_we),
 	.BC(addr[14]),
 	.DI(cpu_dout),
@@ -770,7 +768,7 @@ video video
 (
 	.*,
 	.ce_pix(ce_vid1),
-
+	
 	.VGA_R(r2),
 	.VGA_G(g2),
 	.VGA_B(b2),

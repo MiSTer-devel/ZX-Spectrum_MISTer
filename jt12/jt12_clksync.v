@@ -68,7 +68,8 @@ always @(negedge syn_clk or posedge rst)
 reg		cpu_busy;
 wire		cpu_flag_B, cpu_flag_A;
 
-assign 	cpu_dout = cpu_cs_n ? 8'hFF : { cpu_busy, 5'h0, cpu_flag_B, cpu_flag_A };
+assign 	cpu_dout = cpu_cs_n ? 8'hFF : { cpu_busy, 5'h0, syn_flag_B, syn_flag_A };
+assign   cpu_irq_n = syn_irq_n;
 
 wire		write_raw = !cpu_cs_n && !cpu_wr_n;
 
@@ -76,12 +77,6 @@ reg [1:0]busy_sh;
 always @(posedge cpu_clk) begin
 	busy_sh <= { busy_sh[0], syn_busy };
 end
-
-jt12_sh #(.width(3),.stages(2) ) u_syn2cpu(
-	.clk	( cpu_clk ),
-	.din	( { syn_flag_B, syn_flag_A, syn_irq_n } ),
-	.drop	( { cpu_flag_B, cpu_flag_A, cpu_irq_n } )
-);
 
 always @(posedge cpu_clk) begin
 	reg old_write;

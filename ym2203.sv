@@ -22,8 +22,7 @@ module ym2203
 (
 	input         RESET,
 	input         CLK,       // Global clock
-	input         CE_CPU,    // CPU Clock enable
-	input         CE_YM,     // YM2203 Master Clock enable x2 (due to YM2612 model!)
+	input         CE,        // YM2203 Master Clock enable x2 (due to YM2612 model!)
 
 	input         A0,        // 0 - register number/read FM, 1 - data/read PSG
 	input         WE,        // 0 - read , 1 - write
@@ -33,10 +32,7 @@ module ym2203
 	output  [7:0] CHANNEL_A, // PSG Output channel A
 	output  [7:0] CHANNEL_B, // PSG Output channel B
 	output  [7:0] CHANNEL_C, // PSG Output channel C
- 	output [10:0] CHANNEL_FM,// FM Output channel
-
-	output        PSG_ACTIVE,
-	input         FM_ENA
+ 	output [10:0] CHANNEL_FM // FM Output channel
 );
 
 reg [7:0] ymreg;
@@ -45,16 +41,14 @@ reg [1:0] pres;
 always @(posedge CLK) begin
 
 	if(RESET) pres <= 2;
-	else if(CE_CPU & WE) begin
-		if(FM_ENA) begin
-			if(~A0) ymreg  <= DI;
-			else begin
-				case(ymreg)
-					'h2d: pres[1] <= 1;
-					'h2e: pres[0] <= 1;
-					'h2f: pres    <= 0;
-				endcase
-			end
+	else if(WE) begin
+		if(~A0) ymreg  <= DI;
+		else begin
+			case(ymreg)
+				'h2d: pres[1] <= 1;
+				'h2e: pres[0] <= 1;
+				'h2f: pres    <= 0;
+			endcase
 		end
 	end
 end
@@ -72,7 +66,7 @@ always @(posedge CLK) begin
 	{ce_opn_pre, ce_psg_pre} <= 0;
 
 	if(RESET) {div_opn, div_psg} <= 0;
-	else if (CE_YM) begin
+	else if (CE) begin
 		div_opn <= div_opn + 1'd1;
 		if(div_opn >= opn_pres) div_opn <= 0;
 		ce_opn_pre <= !div_opn;
@@ -86,7 +80,6 @@ end
 reg ce_opn, ce_psg;
 always @(negedge CLK) {ce_opn, ce_psg} <= {ce_opn_pre, ce_psg_pre};
 
-wire [5:0] psg_active;
 wire [7:0] psg_dout;
 ym2149 ym2149
 (
@@ -99,8 +92,7 @@ ym2149 ym2149
 	.DO(psg_dout),
 	.CHANNEL_A(CHANNEL_A),
 	.CHANNEL_B(CHANNEL_B),
-	.CHANNEL_C(CHANNEL_C),
-	.ACTIVE(psg_active)
+	.CHANNEL_C(CHANNEL_C)
 );
 
 wire  [7:0] opn_dout;
@@ -109,11 +101,11 @@ jt12 jt12
 (
 	.rst(RESET),
 
-	.cpu_clk(CLK & CE_CPU),
+	.cpu_clk(CLK),
 	.cpu_din(DI),
 	.cpu_dout(opn_dout),
 	.cpu_addr({1'b0,A0}),
-	.cpu_cs_n(~FM_ENA),
+	.cpu_cs_n(1'b0),
 	.cpu_wr_n(~WE),
 
 	.syn_clk(CLK & ce_opn),
@@ -122,7 +114,6 @@ jt12 jt12
 );
 
 assign DO = A0 ? psg_dout : opn_dout;
-assign PSG_ACTIVE = |psg_active;
 assign CHANNEL_FM = opn_audio[10:0];
 
 endmodule

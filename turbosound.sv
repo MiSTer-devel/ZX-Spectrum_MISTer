@@ -23,36 +23,60 @@
 module turbosound
 (
 	input         RESET,	    // Chip RESET (set all Registers to '0', active high)
-
 	input         CLK,		 // Global clock
-	input         CE_CPU,    // CPU Clock enable
-	input         CE_YM,     // YM2203 Master Clock enable x2 (due to YM2612 model!)
+	input         CE,        // YM2203 Master Clock enable x2 (due to YM2612 model!)
+
 	input         BDIR,	    // Bus Direction (0 - read , 1 - write)
 	input         BC,		    // Bus control
 	input   [7:0] DI,	       // Data In
 	output  [7:0] DO,	       // Data Out
+
 	output [11:0] CHANNEL_L, // Output channel L
-	output [11:0] CHANNEL_R, // Output channel R
-	output        ACTIVE
+	output [11:0] CHANNEL_R  // Output channel R
 );
+
 
 // AY1 selected by default
 reg ay_select = 1;
 reg stat_sel  = 1;
 reg fm_ena    = 0;
+reg ym_wr     = 0;
+reg [7:0] ym_di;
 
 always_ff @(posedge CLK or posedge RESET) begin
+	reg old_BDIR = 0;
+	reg ym_acc = 0;
+
 	if (RESET) begin
 		ay_select <= 1;
 		stat_sel  <= 1;
 		fm_ena    <= 0;
+		ym_acc    <= 0;
+		ym_wr     <= 0;
+		old_BDIR  <= 0;
 	end
-	else if (BDIR & BC & &DI[7:3]) begin
-		ay_select <=  DI[0];
-		stat_sel  <=  DI[1];
-		fm_ena    <= ~DI[2];
+	else begin
+		ym_wr <= 0;
+		old_BDIR <= BDIR;
+		if (~old_BDIR & BDIR) begin
+			if(BC & &DI[7:3]) begin
+				ay_select <=  DI[0];
+				stat_sel  <=  DI[1];
+				fm_ena    <= ~DI[2];
+				ym_acc    <= 0;
+			end
+			else if(BC) begin
+				ym_acc <= !DI[7:4] || fm_ena;
+				ym_wr  <= !DI[7:4] || fm_ena;
+			end
+			else begin
+				ym_wr <= ym_acc;
+			end
+			ym_di <= DI;
+		end
 	end
 end
+
 
 wire  [7:0] psg_ch_a_0;
 wire  [7:0] psg_ch_b_0;
@@ -60,28 +84,23 @@ wire  [7:0] psg_ch_c_0;
 wire [10:0] opn_0;
 wire  [7:0] DO_0;
 
-wire WE_0 = ~ay_select & BDIR;
-wire ay0_playing;
+wire WE_0 = ~ay_select & ym_wr;
 
 ym2203 ym2203_0
 (
 	.RESET(RESET),
 	.CLK(CLK),
-	.CE_CPU(CE_CPU),
-	.CE_YM(CE_YM),
+	.CE(CE),
 
-	.A0(WE_0 ? ~BC : stat_sel),
+	.A0((BDIR|ym_wr) ? ~BC : stat_sel),
 	.WE(WE_0),
-	.DI(DI),
+	.DI(ym_di),
 	.DO(DO_0),
 
 	.CHANNEL_A(psg_ch_a_0),
 	.CHANNEL_B(psg_ch_b_0),
 	.CHANNEL_C(psg_ch_c_0),
-	.CHANNEL_FM(opn_0),
-
-	.PSG_ACTIVE(ay0_playing),
-	.FM_ENA(fm_ena)
+	.CHANNEL_FM(opn_0)
 );
 
 wire  [7:0] psg_ch_a_1;
@@ -90,42 +109,35 @@ wire  [7:0] psg_ch_c_1;
 wire [10:0] opn_1;
 wire  [7:0] DO_1;
 
-wire WE_1 = ay_select & BDIR;
-wire ay1_playing;
+wire WE_1 = ay_select & ym_wr;
 
 ym2203 ym2203_1
 (
 	.RESET(RESET),
 	.CLK(CLK),
-	.CE_CPU(CE_CPU),
-	.CE_YM(CE_YM),
+	.CE(CE),
 
-	.A0(WE_1 ? ~BC : stat_sel),
+	.A0((BDIR|ym_wr) ? ~BC : stat_sel),
 	.WE(WE_1),
-	.DI(DI),
+	.DI(ym_di),
 	.DO(DO_1),
 
 	.CHANNEL_A(psg_ch_a_1),
 	.CHANNEL_B(psg_ch_b_1),
 	.CHANNEL_C(psg_ch_c_1),
-	.CHANNEL_FM(opn_1),
-
-	.PSG_ACTIVE(ay1_playing),
-	.FM_ENA(fm_ena)
+	.CHANNEL_FM(opn_1)
 );
 
 assign DO = ay_select ? DO_1 : DO_0;
-assign ACTIVE = ay0_playing | ay1_playing | fm_ena;
 
 // Mix channel signals from both AY/YM chips (extending to 9 bits width to prevent clipping)
 wire [8:0] sum_ch_a = { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };
 wire [8:0] sum_ch_b = { 1'b0, psg_ch_b_1 } + { 1'b0, psg_ch_b_0 };
 wire [8:0] sum_ch_c = { 1'b0, psg_ch_c_1 } + { 1'b0, psg_ch_c_0 };
 
-// Control output channels (Only AY_1 plays if not in TurboSound mode)
-wire [7:0] psg_a = ~ay0_playing ? psg_ch_a_1 : sum_ch_a[8:1];
-wire [7:0] psg_b = ~ay0_playing ? psg_ch_b_1 : sum_ch_b[8:1];
-wire [7:0] psg_c = ~ay0_playing ? psg_ch_c_1 : sum_ch_c[8:1];
+wire [7:0] psg_a = sum_ch_a[8] ? 8'hFF : sum_ch_a[7:0];
+wire [7:0] psg_b = sum_ch_b[8] ? 8'hFF : sum_ch_b[7:0];
+wire [7:0] psg_c = sum_ch_c[8] ? 8'hFF : sum_ch_c[7:0];
 
 wire signed [11:0] psg_l = {3'b000, psg_a, 1'd0} + {4'b0000, psg_b};
 wire signed [11:0] psg_r = {3'b000, psg_c, 1'd0} + {4'b0000, psg_b};
