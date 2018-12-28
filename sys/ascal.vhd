@@ -411,7 +411,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_llicpt,o_llisize,o_llipos : natural RANGE 0 TO 2**24-1;
   SIGNAL o_llocpt,o_llosize : natural RANGE 0 TO 2**24-1;
   SIGNAL o_lldiff : integer RANGE -2**23 TO 2**23-1 :=0;
-  SIGNAL o_llup,o_llos,o_llop : std_logic;
+  SIGNAL o_llup,o_llos,o_llop,o_llfl : std_logic;
   SIGNAL o_lltune_i : unsigned(15 DOWNTO 0);
   SIGNAL o_llssh : natural RANGE 0 TO 2**24-1;
   SIGNAL o_llcpt : natural RANGE 0 TO 31;
@@ -948,6 +948,7 @@ BEGIN
       
     ELSIF rising_edge(i_clk) THEN
       i_push<='0';
+      i_pushhead<='0';
       i_eol<='0'; -- End Of Line
       i_freeze <=freeze; -- <ASYNC>
       i_iauto<=iauto; -- <ASYNC> ?
@@ -1050,6 +1051,7 @@ BEGIN
           i_vmax<=vimax; -- <ASYNC>
         END IF;
         
+--pragma synthesis_off
         ----------------------------------------------------
         -- TEST : Scan image properties
         IF i_hs='1' AND i_hs_pre='0' AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
@@ -1059,6 +1061,7 @@ BEGIN
         IF i_vs='1' AND i_vs_pre='0' THEN i_vsstart<=i_vcpt;  END IF;
         IF i_vs='0' AND i_vs_pre='1' THEN i_vsend<=i_vcpt;    END IF;
         IF i_de='1' AND i_sof='1'    THEN i_vtotal<=i_vcpt;   END IF;
+--pragma synthesis_on
         
         ----------------------------------------------------
         i_mode<=mode; -- <ASYNC>
@@ -1265,13 +1268,13 @@ BEGIN
       
       ------------------------------------------------------
       -- Push pixels to downscaling line buffer
-      i_lwr<=i_hnp4 AND i_ven5;
+      i_lwr<=i_hnp4 AND i_ven5 AND i_ce;
       IF i_lwr='1' THEN
         i_lwad<=(i_lwad+1) MOD OHRES;
       END IF;
       i_ldw<=i_hpix;
       
-      IF i_hnp3='1' AND i_ven4='1' THEN
+      IF i_hnp3='1' AND i_ven4='1' AND i_ce='1' THEN
         i_lrad<=(i_lrad+1) MOD OHRES;
       END IF;
       
@@ -2203,6 +2206,7 @@ BEGIN
             o_llicpt<=0;
             o_llipos<=o_llocpt;
             o_llisize<=o_llicpt;
+            o_llfl<=i_fl; -- <ASYNC>
           ELSE
             o_llicpt<=o_llicpt+1;
           END IF;
@@ -2221,7 +2225,7 @@ BEGIN
           o_lldiff<=(integer(o_llosize) - integer(o_llisize));
           
           o_lltune_i(14)<='0'; -- Unused
-          o_lltune_i(7 DOWNTO 6)<="00"; -- Unused
+          o_lltune_i(7 DOWNTO 6)<=i_inter & o_llfl; -- <ASYNC>
           IF o_llup='1' THEN
             o_llcpt<=0;
             o_llssh<=o_llosize;
@@ -2385,11 +2389,13 @@ BEGIN
           o_b<=x"00";
         END IF;
         
+--pragma synthesis_off
         IF o_mode(2 DOWNTO 0)="111" AND o_vcpt<2*8 THEN
           o_r<=(OTHERS => o_debug_set);
           o_g<=(OTHERS => o_debug_set);
           o_b<=(OTHERS => o_debug_set);
         END IF;
+--pragma synthesis_on
         
         ----------------------------------------------------
       END IF;
@@ -2397,6 +2403,7 @@ BEGIN
 
   END PROCESS VSCAL;
   
+--pragma synthesis_off
   -----------------------------------------------------------------------------
   -- DEBUG
   Debug:PROCESS(o_clk) IS
@@ -2501,5 +2508,7 @@ BEGIN
     '0' & o_lltune_i(3 DOWNTO 0) & -- 1
     CS("          ");
   ----------------------------------------------------------------------------  
+--pragma synthesis_on
+
 END ARCHITECTURE rtl;
 
