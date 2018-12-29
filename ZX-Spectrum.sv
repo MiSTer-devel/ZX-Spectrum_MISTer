@@ -163,8 +163,10 @@ localparam CONF_STR2 = {
 
 ////////////////////   CLOCKS   ///////////////////
 
+assign CLK_VIDEO = clk_sys;
+
 wire locked;
-wire clk_sys, clk_vid;
+wire clk_sys;
 
 pll pll
 (
@@ -172,7 +174,6 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
-	.outclk_2(clk_vid),
 	.locked(locked)
 );
 
@@ -761,54 +762,7 @@ always_comb begin
 	endcase
 end
 
-wire [1:0] scale = status[16:15];
-assign VGA_SL = {scale == 3, scale == 2};
-
-video video
-(
-	.*,
-	.ce_pix(ce_vid1),
-	
-	.VGA_R(r2),
-	.VGA_G(g2),
-	.VGA_B(b2),
-	.VGA_HS(hs2),
-	.VGA_VS(vs2),
-	.VGA_DE(de2),
-
-	.din(cpu_dout),
-	.page_ram(page_ram[2:0]),
-	.scale(scale == 1),
-	.forced_scandoubler(forced_scandoubler || scale),
-	.wide(status[5])
-);
-
-wire ce_vid1;
-reg  ce_vid2;
-always @(posedge clk_sys) ce_vid2 <= ce_vid1;
-
-wire ce_vid = ce_vid2 | ce_vid1;
-
-reg       ce_pix, ce_pix1;
-reg [7:0] r,r1,r2,g,g1,g2,b,b1,b2;
-reg       hs,hs1,hs2,vs,vs1,vs2,de,de1,de2;
-
-always @(posedge clk_vid) begin
-	ce_pix1 <= ce_vid;
-	ce_pix <= ce_pix1;
-
-	{r1,g1,b1} <= {r2,g2,b2};
-	{r,g,b} <= {r1,g1,b1};
-	
-	{hs1,vs1,de1} <= {hs2,vs2,de2};
-	{hs,vs,de} <= {hs1,vs1,de1};
-end
-
-assign {VGA_R,VGA_G,VGA_B} = {r,g,b};
-assign {VGA_HS,VGA_VS,VGA_DE} = {hs,vs,de};
-assign CE_PIXEL = ce_pix;
-assign CLK_VIDEO = clk_vid;
-
+video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]), .wide(status[5]));
 
 reg new_vmode = 0;
 always @(posedge clk_sys) begin
