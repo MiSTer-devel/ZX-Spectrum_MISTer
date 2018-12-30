@@ -203,7 +203,7 @@ always @(negedge clk_sys) begin
 	ce_28m  <= !counter[1:0];
 	ce_7mp  <= !counter[3] & !counter[2:0];
 	ce_7mn  <=  counter[3] & !counter[2:0];
-	ce_ym   <= !counter[3:0] & ~pause;
+	ce_ym   <= !counter[4:0] & ~pause;
 
 	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
@@ -762,7 +762,10 @@ always_comb begin
 	endcase
 end
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .scale(status[16:15]), .wide(status[5]));
+wire [1:0] scale = status[16:15];
+assign VGA_SL = {scale==3, scale==2};
+
+video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
 
 reg new_vmode = 0;
 always @(posedge clk_sys) begin

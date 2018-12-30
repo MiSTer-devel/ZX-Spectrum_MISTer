@@ -233,7 +233,7 @@ video_mixer #(.LINE_LENGTH(896), .HALF_DEPTH(1)) video_mixer
 	.ce_pix_out(ce_pix),
 
 	.hq2x(scale == 1),
-	.scanlines({scale==3, scale==2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 
 	.R(Rx),
