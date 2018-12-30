@@ -77,55 +77,52 @@ always_ff @(posedge CLK or posedge RESET) begin
 	end
 end
 
-
 wire  [7:0] psg_ch_a_0;
 wire  [7:0] psg_ch_b_0;
 wire  [7:0] psg_ch_c_0;
-wire [10:0] opn_0;
+wire [15:0] opn_0;
 wire  [7:0] DO_0;
 
-wire WE_0 = ~ay_select & ym_wr;
-
-ym2203 ym2203_0
+jt03 ym2203_0
 (
-	.RESET(RESET),
-	.CLK(CLK),
-	.CE(CE),
+	.rst(RESET),
+	.clk(CLK),
+	.cen(CE),
+	.din(ym_di),
+	.addr((BDIR|ym_wr) ? ~BC : stat_sel),
+	.cs_n(ay_select),
+	.wr_n(~ym_wr),
+	.dout(DO_0),
 
-	.A0((BDIR|ym_wr) ? ~BC : stat_sel),
-	.WE(WE_0),
-	.DI(ym_di),
-	.DO(DO_0),
+	.psg_A(psg_ch_a_0),
+	.psg_B(psg_ch_b_0),
+	.psg_C(psg_ch_c_0),
 
-	.CHANNEL_A(psg_ch_a_0),
-	.CHANNEL_B(psg_ch_b_0),
-	.CHANNEL_C(psg_ch_c_0),
-	.CHANNEL_FM(opn_0)
+	.fm_snd(opn_0)
 );
 
 wire  [7:0] psg_ch_a_1;
 wire  [7:0] psg_ch_b_1;
 wire  [7:0] psg_ch_c_1;
-wire [10:0] opn_1;
+wire [15:0] opn_1;
 wire  [7:0] DO_1;
 
-wire WE_1 = ay_select & ym_wr;
-
-ym2203 ym2203_1
+jt03 ym2203_1
 (
-	.RESET(RESET),
-	.CLK(CLK),
-	.CE(CE),
+	.rst(RESET),
+	.clk(CLK),
+	.cen(CE),
+	.din(ym_di),
+	.addr((BDIR|ym_wr) ? ~BC : stat_sel),
+	.cs_n(~ay_select),
+	.wr_n(~ym_wr),
+	.dout(DO_1),
 
-	.A0((BDIR|ym_wr) ? ~BC : stat_sel),
-	.WE(WE_1),
-	.DI(ym_di),
-	.DO(DO_1),
+	.psg_A(psg_ch_a_1),
+	.psg_B(psg_ch_b_1),
+	.psg_C(psg_ch_c_1),
 
-	.CHANNEL_A(psg_ch_a_1),
-	.CHANNEL_B(psg_ch_b_1),
-	.CHANNEL_C(psg_ch_c_1),
-	.CHANNEL_FM(opn_1)
+	.fm_snd(opn_1)
 );
 
 assign DO = ay_select ? DO_1 : DO_0;
@@ -141,7 +138,7 @@ wire [7:0] psg_c = sum_ch_c[8] ? 8'hFF : sum_ch_c[7:0];
 
 wire signed [11:0] psg_l = {3'b000, psg_a, 1'd0} + {4'b0000, psg_b};
 wire signed [11:0] psg_r = {3'b000, psg_c, 1'd0} + {4'b0000, psg_b};
-wire signed [11:0] opn_s = {{2{opn_0[10]}}, opn_0[10:1]} + {{2{opn_1[10]}}, opn_1[10:1]};
+wire signed [11:0] opn_s = {{2{opn_0[15]}}, opn_0[15:6]} + {{2{opn_1[15]}}, opn_1[15:6]};
 
 assign CHANNEL_L = fm_ena ? opn_s + psg_l : psg_l;
 assign CHANNEL_R = fm_ena ? opn_s + psg_r : psg_r;

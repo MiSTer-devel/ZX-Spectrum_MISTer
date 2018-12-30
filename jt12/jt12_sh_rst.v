@@ -20,10 +20,12 @@
 
 `timescale 1ns / 1ps
 
+// stages must be greater than 2
 module jt12_sh_rst #(parameter width=5, stages=32, rstval=1'b0 )
 (
-//	input					rst,	
+	input					rst,	
 	input 					clk,
+	input					clk_en,
 	input		[width-1:0]	din,
    	output		[width-1:0]	drop
 );
@@ -35,18 +37,18 @@ integer k;
 generate
 initial
 	for (k=0; k < width; k=k+1) begin
-		bits[k] <= { stages{rstval}};
+		bits[k] = { stages{rstval}};
 	end
 endgenerate
 
 generate
 	for (i=0; i < width; i=i+1) begin: bit_shifter
-		always @(posedge clk) begin
-			if( stages> 1 )
+		always @(posedge clk) 
+			if( rst ) begin
+				bits[i] <= {stages{rstval}};
+			end else if(clk_en) begin
 				bits[i] <= {bits[i][stages-2:0], din[i]};
-			else
-				bits[i] <= din[i];
-		end
+			end
 		assign drop[i] = bits[i][stages-1];
 	end
 endgenerate
