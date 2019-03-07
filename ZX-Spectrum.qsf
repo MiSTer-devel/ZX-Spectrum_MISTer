@@ -63,7 +63,7 @@ set_global_assignment -name PHYSICAL_SYNTHESIS_COMBO_LOGIC_FOR_AREA ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_REGISTER_DUPLICATION ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING ON
 set_global_assignment -name ALM_REGISTER_PACKING_EFFORT LOW
-set_global_assignment -name SEED 1
+set_global_assignment -name SEED 3
 
 #============================================================
 # ADC
@@ -365,6 +365,7 @@ set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name QIP_FILE t80/T80.qip
 set_global_assignment -name QIP_FILE jt12/jt03.qip
+set_global_assignment -name QIP_FILE sdram.qip
 set_global_assignment -name SDC_FILE "ZX-Spectrum.sdc"
 set_global_assignment -name SYSTEMVERILOG_FILE saa1099.sv
 set_global_assignment -name SYSTEMVERILOG_FILE turbosound.sv
@@ -374,7 +375,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE compressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE snap_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE u765.sv
-set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ddram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE video.sv
 set_global_assignment -name VERILOG_FILE dpram.v
@@ -382,4 +382,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE tape.sv
 set_global_assignment -name VERILOG_FILE mouse.v
 set_global_assignment -name SYSTEMVERILOG_FILE keyboard.sv
 set_global_assignment -name SYSTEMVERILOG_FILE "ZX-Spectrum.sv"
+set_global_assignment -name ADV_NETLIST_OPT_SYNTH_WYSIWYG_REMAP ON
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
