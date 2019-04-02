@@ -29,7 +29,7 @@ set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEBA6U23I7
 set_global_assignment -name TOP_LEVEL_ENTITY sys_top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 16.1.2
-set_global_assignment -name LAST_QUARTUS_VERSION "16.1.2 Standard Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "17.1.0 Lite Edition"
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "01:53:30  APRIL 20, 2017"
 set_global_assignment -name DEVICE_FILTER_PACKAGE UFBGA
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 672
@@ -68,14 +68,6 @@ set_global_assignment -name SEED 3
 #============================================================
 # ADC
 #============================================================
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_CONVST
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SCK
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDI
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDO
-set_location_assignment PIN_U9 -to ADC_CONVST
-set_location_assignment PIN_V10 -to ADC_SCK
-set_location_assignment PIN_AC4 -to ADC_SDI
-set_location_assignment PIN_AD4 -to ADC_SDO
 
 #============================================================
 # ARDUINO
@@ -163,6 +155,19 @@ set_location_assignment PIN_AE25 -to AUDIO_R
 set_location_assignment PIN_AG26 -to AUDIO_SPDIF
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_*
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to AUDIO_*
+
+#============================================================
+# ADC
+#============================================================
+set_location_assignment PIN_U9 -to ADC_CONVST
+set_location_assignment PIN_V10 -to ADC_SCK
+set_location_assignment PIN_AC4 -to ADC_SDI
+set_location_assignment PIN_AD4 -to ADC_SDO
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_CONVST
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SCK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDI
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_SDO
+
 
 #============================================================
 # SDRAM
