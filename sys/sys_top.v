@@ -83,6 +83,12 @@ module sys_top
 	output        SDIO_CLK,
 	input         SDIO_CD,
 
+    ////////// ADC //////////////
+    input         ADC_SDO,
+    output        ADC_CONVST,
+    output        ADC_SCK,
+    output        ADC_SDI,    
+
 	////////// MB KEY ///////////
 	input   [1:0] KEY,
 
@@ -98,7 +104,25 @@ module sys_top
 
 
 assign SDIO_DAT[2:1] = 2'bZZ;
+reg tapein;
 
+/////////// Analog Tape Reading
+wire [11:0] adc_read;
+always @(posedge FPGA_CLK3_50 ) begin
+    tapein <= adc_read > 12'h40; // set a threshold different from 0 to avoid
+        // noise
+end
+
+jtframe_2308 #(.DIV_MAX(8'd10)) tape_adc(
+    .rst_n      ( ~reset        ),
+    .clk        ( FPGA_CLK3_50  ),
+    .cen        ( ce_pix        ),  // clk & cen < 40 MHz
+    .adc_sdi    ( ADC_SDI       ),
+    .adc_convst ( ADC_CONVST    ),
+    .adc_sck    ( ADC_SCK       ),
+    .adc_sdo    ( ADC_SDO       ),
+    .adc_read   ( adc_read      )
+);
 
 //////////////////////////  LEDs  ///////////////////////////////////////
 
@@ -830,6 +854,7 @@ wire        uart_txd;
 wire        osd_status;
 
 wire  [5:0] user_out, user_in;
+assign led_user = tapein;
 
 emu emu
 (
@@ -849,7 +874,8 @@ emu emu
 	.VGA_F1(f1),
 	.VGA_SL(scanlines),
 
-	.LED_USER(led_user),
+    //.LED_USER(led_user),
+	.LED_USER(),
 	.LED_POWER(led_power),
 	.LED_DISK(led_disk),
 
@@ -860,7 +886,7 @@ emu emu
 	.AUDIO_R(audio_rs),
 	.AUDIO_S(audio_s),
 	.AUDIO_MIX(audio_mix),
-	.TAPE_IN(0),
+	.TAPE_IN(tapein),
 
 	.SD_SCK(SDIO_CLK),
 	.SD_MOSI(SDIO_CMD),
