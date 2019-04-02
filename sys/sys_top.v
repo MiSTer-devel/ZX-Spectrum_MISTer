@@ -113,7 +113,7 @@ always @(posedge FPGA_CLK3_50 ) begin
         // noise
 end
 
-jtframe_2308 #(.DIV_MAX(8'd10)) tape_adc(
+jtframe_2308 #(.DIV_MAX(8'd50)) tape_adc(
     .rst_n      ( ~reset        ),
     .clk        ( FPGA_CLK3_50  ),
     .cen        ( ce_pix        ),  // clk & cen < 40 MHz
