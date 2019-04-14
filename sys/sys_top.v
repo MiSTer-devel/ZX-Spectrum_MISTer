@@ -113,16 +113,30 @@ always @(posedge FPGA_CLK3_50 ) begin
         // noise
 end
 
-jtframe_2308 #(.DIV_MAX(8'd50)) tape_adc(
-    .rst_n      ( ~reset        ),
+reg [1:0] adccen_cnt=0;
+reg adccen;
+always @(negedge FPGA_CLK3_50) begin
+    adccen_cnt <= adccen_cnt+2'd1;
+    adccen <= adccen_cnt == 2'b00;
+end
+
+reg [5:0] adcrst_sr=6'b100_000;
+always @(negedge FPGA_CLK3_50) begin
+    adcrst_sr <= { adcrst_sr[4:0], 1'b1 };
+end
+
+jtframe_2308 tape_adc(
+    .rst_n      ( adcrst_sr[5]  ),
     .clk        ( FPGA_CLK3_50  ),
-    .cen        ( ce_pix        ),  // clk & cen < 40 MHz
+    .cen        ( adccen        ),  // clk & cen < 40 MHz
     .adc_sdi    ( ADC_SDI       ),
     .adc_convst ( ADC_CONVST    ),
     .adc_sck    ( ADC_SCK       ),
     .adc_sdo    ( ADC_SDO       ),
     .adc_read   ( adc_read      )
 );
+
+assign LED = adc_read[7:0];
 
 //////////////////////////  LEDs  ///////////////////////////////////////
 
@@ -139,7 +153,7 @@ assign LED_HDD   = led_d ? 1'bZ : 1'b0;
 assign LED_USER  = led_u ? 1'bZ : 1'b0;
 
 //LEDs on main board
-assign LED = (led_overtake & led_state) | (~led_overtake & {1'b0,led_locked,1'b0, ~led_p, 1'b0, ~led_d, 1'b0, ~led_u});
+// assign LED = (led_overtake & led_state) | (~led_overtake & {1'b0,led_locked,1'b0, ~led_p, 1'b0, ~led_d, 1'b0, ~led_u});
 
 
 //////////////////////////  Buttons  ///////////////////////////////////
@@ -855,7 +869,7 @@ wire        osd_status;
 
 wire  [5:0] user_out, user_in;
 assign led_user = tapein;
-
+/*
 emu emu
 (
 	.CLK_50M(FPGA_CLK3_50),
@@ -929,9 +943,9 @@ emu emu
 
 	.OSD_STATUS(osd_status)
 );
+*/
 
 endmodule
-
 /////////////////////////////////////////////////////////////////////
 
 module sync_fix
