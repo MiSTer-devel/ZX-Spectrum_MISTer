@@ -62,7 +62,9 @@ module emu
 	output [15:0] AUDIO_R,
 	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
 	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
-	input         TAPE_IN,
+
+	//ADC
+	inout   [3:0] ADC_BUS,
 
 	// SD-SPI
 	output        SD_SCK,
@@ -123,7 +125,7 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[3:2];
 
-assign LED_USER  = ioctl_download | tape_led;
+assign LED_USER  = ioctl_download | tape_led | tape_adc_act;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
@@ -1056,7 +1058,16 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign tape_in = tape_loaded_reg ? tape_vin : ~(ear_out | mic_out);
+assign tape_in = tape_loaded_reg ? tape_vin : tape_adc_act ? tape_adc : ~(ear_out | mic_out);
+
+wire tape_adc, tape_adc_act;
+ltc2308_tape ltc2308_tape
+(
+	.clk(CLK_50M),
+	.ADC_BUS(ADC_BUS),
+	.dout(tape_adc),
+	.active(tape_adc_act)
+);
 
 //////////////////  ARCH SET  //////////////////
 

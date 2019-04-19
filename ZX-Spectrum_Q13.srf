@@ -22,6 +22,7 @@
 { "" "" "" "RST port on the PLL is not properly connected on instance emu:emu\|pll:pll\|pll_0002:pll_inst\|altera_pll:altera_pll_i\|general\[2\].gpll. The reset port on the PLL should be connected. If the PLL loses lock for any reason, you might need to manually reset the PLL in order to re-establish lock to the reference clock." {  } {  } 0 0 "" 0 0 "Quartus II" 0 -1 0 ""}
 { "" "" "" "*" {  } {  } 0 10268 "" 0 0 "Quartus II" 0 -1 0 ""}
 { "" "" "" "*" {  } {  } 0 276027 "" 0 0 "Quartus II" 0 -1 0 ""}
+{ "" "" "" "*" {  } {  } 0 276020 "" 0 0 "Quartus II" 0 -1 0 ""}
 { "" "" "" "altera_pll.v" {  } {  } 0 9999 "" 0 0 "Quartus II" 0 -1 0 ""}
 { "" "" "" "altera_cyclonev_pll.v" {  } {  } 0 9999 "" 0 0 "Quartus II" 0 -1 0 ""}
 { "" "" "" "altera_pll_reconfig_core.v" {  } {  } 0 9999 "" 0 0 "Quartus II" 0 -1 0 ""}
