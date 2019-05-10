@@ -24,7 +24,7 @@ module turbosound
 (
 	input         RESET,	    // Chip RESET (set all Registers to '0', active high)
 	input         CLK,		 // Global clock
-	input         CE,        // YM2203 Master Clock enable x2 (due to YM2612 model!)
+	input         CE,        // YM2203 Master Clock enable
 
 	input         BDIR,	    // Bus Direction (0 - read , 1 - write)
 	input         BC,		    // Bus control
@@ -36,6 +36,29 @@ module turbosound
 );
 
 
+reg       RESET_s;
+reg       BDIR_s;
+reg       BC_s;
+reg [7:0] DI_s;
+
+always_ff @(posedge CLK) begin
+	reg       RESET_d;
+	reg       BDIR_d;
+	reg       BC_d;
+	reg [7:0] DI_d;
+
+	RESET_d <= RESET;
+	BDIR_d <= BDIR;
+	BC_d <= BC;
+	DI_d <= DI;
+	
+	RESET_s <= RESET_d;
+	BDIR_s <= BDIR_d;
+	BC_s <= BC_d;
+	DI_s <= DI_d;
+end
+
+
 // AY1 selected by default
 reg ay_select = 1;
 reg stat_sel  = 1;
@@ -43,11 +66,11 @@ reg fm_ena    = 0;
 reg ym_wr     = 0;
 reg [7:0] ym_di;
 
-always_ff @(posedge CLK or posedge RESET) begin
+always_ff @(posedge CLK or posedge RESET_s) begin
 	reg old_BDIR = 0;
 	reg ym_acc = 0;
 
-	if (RESET) begin
+	if (RESET_s) begin
 		ay_select <= 1;
 		stat_sel  <= 1;
 		fm_ena    <= 0;
@@ -57,22 +80,22 @@ always_ff @(posedge CLK or posedge RESET) begin
 	end
 	else begin
 		ym_wr <= 0;
-		old_BDIR <= BDIR;
-		if (~old_BDIR & BDIR) begin
-			if(BC & &DI[7:3]) begin
-				ay_select <=  DI[0];
-				stat_sel  <=  DI[1];
-				fm_ena    <= ~DI[2];
+		old_BDIR <= BDIR_s;
+		if (~old_BDIR & BDIR_s) begin
+			if(BC_s & &DI_s[7:3]) begin
+				ay_select <=  DI_s[0];
+				stat_sel  <=  DI_s[1];
+				fm_ena    <= ~DI_s[2];
 				ym_acc    <= 0;
 			end
-			else if(BC) begin
-				ym_acc <= !DI[7:4] || fm_ena;
-				ym_wr  <= !DI[7:4] || fm_ena;
+			else if(BC_s) begin
+				ym_acc <= !DI_s[7:4] || fm_ena;
+				ym_wr  <= !DI_s[7:4] || fm_ena;
 			end
 			else begin
 				ym_wr <= ym_acc;
 			end
-			ym_di <= DI;
+			ym_di <= DI_s;
 		end
 	end
 end
@@ -85,11 +108,11 @@ wire  [7:0] DO_0;
 
 jt03 ym2203_0
 (
-	.rst(RESET),
+	.rst(RESET_s),
 	.clk(CLK),
 	.cen(CE),
 	.din(ym_di),
-	.addr((BDIR|ym_wr) ? ~BC : stat_sel),
+	.addr((BDIR_s|ym_wr) ? ~BC_s : stat_sel),
 	.cs_n(ay_select),
 	.wr_n(~ym_wr),
 	.dout(DO_0),
@@ -109,11 +132,11 @@ wire  [7:0] DO_1;
 
 jt03 ym2203_1
 (
-	.rst(RESET),
+	.rst(RESET_s),
 	.clk(CLK),
 	.cen(CE),
 	.din(ym_di),
-	.addr((BDIR|ym_wr) ? ~BC : stat_sel),
+	.addr((BDIR_s|ym_wr) ? ~BC_s : stat_sel),
 	.cs_n(~ay_select),
 	.wr_n(~ym_wr),
 	.dout(DO_1),

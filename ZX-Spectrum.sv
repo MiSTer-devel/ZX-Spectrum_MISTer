@@ -191,19 +191,21 @@ pll pll
 );
 
 
-reg  ce_ym;  //7MHz
-reg  ce_7mp;
-reg  ce_7mn;
-reg  ce_28m;
+(* direct_enable *) reg  ce_ym;  //3.5MHz
+(* direct_enable *) reg  ce_7mp;
+(* direct_enable *) reg  ce_7mn;
+(* direct_enable *) reg  ce_28m;
 
 reg  pause;
 reg  cpu_en = 1;
 reg  ce_cpu_tp;
 reg  ce_cpu_tn;
-reg  ce_tape, ce_wd1793, ce_u765;
+(* direct_enable *) reg ce_tape;
+(* direct_enable *) reg ce_wd1793;
+(* direct_enable *) reg ce_u765;
 
-wire ce_cpu_p = cpu_en & cpu_p;
-wire ce_cpu_n = cpu_en & cpu_n;
+(* direct_enable *) wire ce_cpu_p = cpu_en & cpu_p;
+(* direct_enable *) wire ce_cpu_n = cpu_en & cpu_n;
 
 wire cpu_p = ~&turbo ? ce_cpu_tp : ce_cpu_sp;
 wire cpu_n = ~&turbo ? ce_cpu_tn : ce_cpu_sn;
