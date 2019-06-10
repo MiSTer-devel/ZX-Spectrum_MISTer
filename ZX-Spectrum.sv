@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [44:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -144,7 +144,7 @@ localparam CONF_PLUSD = "(+D) ";
 localparam CONF_PLUS3 = "(+3) ";
 
 `include "build_id.v"
-localparam CONF_STR1 = {
+localparam CONF_STR = {
 	"Spectrum;;",
 	"S,TRDIMGDSKMGT,Load Disk;",
 	"-;",
@@ -164,11 +164,8 @@ localparam CONF_STR1 = {
 	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
 	"OD,Port #FF,Timex,SAA1099;",
 	"OE,ULA+,Enabled,Disabled;",
-	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;"
-};
-
-localparam CONF_STR2 = {
-	"0,Reset & apply;",
+	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
+	"D0R0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
 	"V,v",`BUILD_DATE
 };
@@ -326,12 +323,12 @@ wire        ioctl_wait;
 reg         status_set;
 reg  [31:0] status_out;
 
-hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
+hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 
-	.conf_str({CONF_STR1, need_apply ? "R" : "+", CONF_STR2, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
+	.conf_str({CONF_STR, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
@@ -341,6 +338,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3)+($size(CONF_STR2)>>3)+5+1)) hps_io
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
+	.status_menumask({~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset),
 	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
