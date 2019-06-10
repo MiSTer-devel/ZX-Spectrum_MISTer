@@ -1018,6 +1018,7 @@ smart_tape tape
 	.ce(ce_tape),
 
 	.turbo(tape_turbo),
+	.mode48k(page_disable),
 	.pause(Fn[1] & !mod),
 	.prev(Fn[2] & !mod),
 	.next(Fn[3] & !mod),
@@ -1034,7 +1035,7 @@ smart_tape tape
 
 	.ioctl_download(ioctl_download & (ioctl_index[4:0] == 2)),
 	.tape_size(ioctl_addr),
-	.tape_mode(!ioctl_index[7:6]),
+	.tape_mode(ioctl_index[7:6]),
 
 	.m1(~nM1 & ~nMREQ),
 	.rom_en(active_48_rom),
