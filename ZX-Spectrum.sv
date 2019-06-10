@@ -557,7 +557,7 @@ always_comb begin
 		'b001XX: page_rom <=   4'b1100; //plusd
 		'b0001X: page_rom <= { 2'b11, plus3, ~plus3 }; //MF128/+3
 		'b00001: page_rom <= { 2'b10, page_reg_plus3[2], page_reg[4] }; //+3
-		'b00000: page_rom <= { 3'b011, zx48 | page_reg[4] }; //up to +2
+		'b00000: page_rom <= { zx48, 2'b11, zx48 | page_reg[4] }; //up to +2
 	endcase
 end
 
@@ -1059,7 +1059,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign tape_in = tape_loaded_reg ? tape_vin : tape_adc_act ? tape_adc : ~(ear_out | mic_out);
+assign tape_in = tape_loaded_reg ? tape_vin : tape_adc_act & tape_adc;
 
 wire tape_adc, tape_adc_act;
 ltc2308_tape ltc2308_tape
