@@ -177,6 +177,7 @@ assign CLK_VIDEO = clk_sys;
 
 wire locked;
 wire clk_sys;
+wire clk_ym;
 
 pll pll
 (
@@ -184,6 +185,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
+	.outclk_2(clk_ym),
 	.locked(locked)
 );
 
@@ -215,7 +217,6 @@ always @(negedge clk_sys) begin
 	ce_28m  <= !counter[1:0];
 	ce_7mp  <= !counter[3] & !counter[2:0];
 	ce_7mn  <=  counter[3] & !counter[2:0];
-	ce_ym   <= !counter[4:0] & ~pause;
 
 	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
@@ -224,6 +225,13 @@ always @(negedge clk_sys) begin
 	ce_u765   <= !(counter & turbo) & cpu_en;
 
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
+end
+
+always @(negedge clk_ym) begin
+	reg [3:0] counter = 0;
+
+	counter <=  counter + 1'd1;
+	ce_ym   <= !counter & ~pause;
 end
 
 
@@ -650,7 +658,7 @@ wire        aud_reset = reset | psg_reset;
 turbosound turbosound
 (
 	.RESET(aud_reset),
-	.CLK(clk_sys),
+	.CLK(clk_ym),
 	.CE(ce_ym),
 	.BDIR(psg_we),
 	.BC(addr[14]),
