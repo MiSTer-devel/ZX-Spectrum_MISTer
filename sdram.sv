@@ -59,7 +59,9 @@ assign SDRAM_nCS  = command[3];
 assign SDRAM_nRAS = command[2];
 assign SDRAM_nCAS = command[1];
 assign SDRAM_nWE  = command[0];
-assign SDRAM_CKE  = cke;
+assign SDRAM_CKE  = 1;
+assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
+
 assign dout       = latched ? data_l : data_d;
 
 // no burst configured
@@ -87,7 +89,6 @@ localparam CMD_LOAD_MODE       = 4'b0000;
 
 reg [13:0] refresh_count = startup_refresh_max - sdram_startup_cycles;
 reg  [3:0] command = CMD_INHIBIT;
-reg        cke     = 0;
 reg [24:0] save_addr;
 
 reg        latched;
@@ -146,10 +147,7 @@ always @(posedge clk) begin
 			//--  * LOAD_MODE_REG 
 			//--  * 2 cycles wait
 			//------------------------------------------------------------------------
-			cke        <= 1;
 			SDRAM_DQ   <= 16'bZZZZZZZZZZZZZZZZ;
-			SDRAM_DQML <= 1;
-			SDRAM_DQMH <= 1;
 			SDRAM_A    <= 0;
 			SDRAM_BA   <= 0;
 
@@ -219,11 +217,12 @@ always @(posedge clk) begin
 		end
 
 		// ACTIVE-to-READ or WRITE delay >20ns (-75)
-		STATE_OPEN_1: state <= STATE_OPEN_2;
+		STATE_OPEN_1: begin
+			SDRAM_A     <= '1;
+			state       <= STATE_OPEN_2;
+		end
 		STATE_OPEN_2: begin
-			SDRAM_A     <= {4'b0010, save_addr[22:14]}; 
-			SDRAM_DQML  <= save_we & (new_wtbt ? ~new_wtbt[0] :  save_addr[0]);
-			SDRAM_DQMH  <= save_we & (new_wtbt ? ~new_wtbt[1] : ~save_addr[0]);
+			SDRAM_A     <= {save_we & (new_wtbt ? ~new_wtbt[1] : ~save_addr[0]), save_we & (new_wtbt ? ~new_wtbt[0] :  save_addr[0]), 2'b10, save_addr[22:14]};
 			state       <= save_we ? STATE_WRITE : STATE_READ;
 		end
 
