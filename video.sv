@@ -111,17 +111,17 @@ always @(posedge clk_sys) begin
 		sync <= 0;
 		if(!mZX) begin
 			if(hc == 312) HBlank <= 1;
-			if(hc == 338) {HSync,sync} <= 3;
+			if(hc == 338) sync   <= 1;
 			if(hc == 370) HSync  <= 0;
 			if(hc == 420) HBlank <= 0;
 		end else if(m128) begin
 			if(hc == 312) HBlank <= 1;
-			if(hc == 340) {HSync,sync} <= 3; //ULA 6C
+			if(hc == 340) sync   <= 1; //ULA 6C
 			if(hc == 372) HSync  <= 0; //ULA 6C
 			if(hc == 424) HBlank <= 0;
 		end else begin
 			if(hc == 300) HBlank <= 1;
-			if(hc == 336) {HSync,sync} <= 3; //ULA 5C
+			if(hc == 336) sync   <= 1; //ULA 5C
 			if(hc == 368) HSync  <= 0; //ULA 5C
 			if(hc == 428) HBlank <= 0;
 		end
@@ -129,6 +129,7 @@ always @(posedge clk_sys) begin
 		if(wide) HBlank <= !(hc < 312 || hc >= ((mZX && m128) ? 455-33 : 447-33));
 
 		if(sync) begin
+			HSync <= 1;
 			if(mZX) begin
 				if(vc == 236) VBlank <= 1;
 				if(vc == 240) VSync  <= 1;
