@@ -542,10 +542,10 @@ dpram #(.ADDRWIDTH(15)) vram
     .q_b(vram_dout)
 );
 
-(* maxfan = 10 *) reg zx48;
-(* maxfan = 10 *) reg p1024;
-(* maxfan = 10 *) reg pf1024;
-(* maxfan = 10 *) reg plus3;
+reg        zx48;
+reg        p1024;
+reg        pf1024;
+reg        plus3;
 reg        page_scr_copy;
 reg        shadow_rom;
 reg  [7:0] page_reg;
@@ -771,8 +771,8 @@ compressor compressor
 );
 
 ////////////////////   VIDEO   ///////////////////
-(* maxfan = 10 *) wire ce_cpu_sn;
-(* maxfan = 10 *) wire ce_cpu_sp;
+wire        ce_cpu_sn;
+wire        ce_cpu_sp;
 wire [14:0] vram_addr;
 wire  [7:0] vram_dout;
 wire  [7:0] port_ff;

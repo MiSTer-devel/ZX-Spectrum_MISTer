@@ -81,7 +81,6 @@ wire [2:0] CMD_NOP             = 3'b111;
 wire [2:0] CMD_ACTIVE          = 3'b011;
 wire [2:0] CMD_READ            = 3'b101;
 wire [2:0] CMD_WRITE           = 3'b100;
-wire [2:0] CMD_BURST_TERMINATE = 3'b110;
 wire [2:0] CMD_PRECHARGE       = 3'b010;
 wire [2:0] CMD_AUTO_REFRESH    = 3'b001;
 wire [2:0] CMD_LOAD_MODE       = 3'b000;
