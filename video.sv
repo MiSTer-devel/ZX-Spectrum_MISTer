@@ -66,6 +66,7 @@ module video
 	input   [1:0] scale,
 	input         forced_scandoubler,
 	input         wide,
+	inout  [21:0] gamma_bus,
 
 	// Video outputs
 	output  [7:0] VGA_R,
@@ -226,10 +227,11 @@ always_comb casex({HBlank | VSync, ulap_ena, ulap_mono})
 	'b011: {Gx,Rx,Bx} <= {color, 4'b0000};
 endcase
 
-video_mixer #(.LINE_LENGTH(896), .HALF_DEPTH(1)) video_mixer
+video_mixer #(.LINE_LENGTH(896), .GAMMA(1)) video_mixer
 (
 	.*,
 
+	.clk_vid(clk_sys),
 	.ce_pix(ce_7mp | (mode512 & ce_7mn)),
 	.ce_pix_out(ce_pix),
 

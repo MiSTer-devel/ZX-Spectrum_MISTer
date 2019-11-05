@@ -337,6 +337,8 @@ wire        ioctl_wait;
 reg         status_set;
 reg  [31:0] status_out;
 
+wire [21:0] gamma_bus;
+
 hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -373,7 +375,9 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 	.ioctl_dout(ioctl_dout),
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
-	.ioctl_wait(ioctl_wait)
+	.ioctl_wait(ioctl_wait),
+	
+	.gamma_bus(gamma_bus)
 );
 
 reg  [2:0] cur_mode = 0;
