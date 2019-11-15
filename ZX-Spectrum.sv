@@ -179,11 +179,11 @@ localparam CONF_STR = {
 
 ////////////////////   CLOCKS   ///////////////////
 
-assign CLK_VIDEO = clk_sys;
+assign CLK_VIDEO = clk_56;
 
 wire locked;
-wire clk_sys;
-wire clk_ym;
+wire clk_sys, clk_56;
+wire clk_aud = clk_56;
 
 pll pll
 (
@@ -191,15 +191,13 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(SDRAM_CLK),
-	.outclk_2(clk_ym),
+	.outclk_2(clk_56),
 	.locked(locked)
 );
 
 
-(* direct_enable *) reg  ce_ym;  //3.5MHz
 (* direct_enable *) reg  ce_7mp;
 (* direct_enable *) reg  ce_7mn;
-(* direct_enable *) reg  ce_28m;
 
 reg  pause;
 reg  cpu_en = 1;
@@ -215,12 +213,11 @@ reg  ce_cpu_tn;
 wire cpu_p = ~&turbo ? ce_cpu_tp : ce_cpu_sp;
 wire cpu_n = ~&turbo ? ce_cpu_tn : ce_cpu_sn;
 
-always @(negedge clk_sys) begin
+always @(posedge clk_sys) begin
 	reg [5:0] counter = 0;
 
 	counter <=  counter + 1'd1;
 
-	ce_28m  <= !counter[1:0];
 	ce_7mp  <= !counter[3] & !counter[2:0];
 	ce_7mn  <=  counter[3] & !counter[2:0];
 
@@ -231,13 +228,6 @@ always @(negedge clk_sys) begin
 	ce_u765   <= !(counter & turbo) & cpu_en;
 
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
-end
-
-always @(negedge clk_ym) begin
-	reg [3:0] counter = 0;
-
-	counter <=  counter + 1'd1;
-	ce_ym   <= !counter & ~pause;
 end
 
 
@@ -483,10 +473,13 @@ reg         ram_rd;
 wire  [7:0] ram_dout;
 wire        ram_ready;
 
+reg [24:0] load_addr;
+always @(posedge clk_sys) load_addr <= ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
+
 always_comb begin
 	casex({snap_reset, dma, tape_req, page_special, addr[15:14]})
 		'b1XX_X_XX: ram_addr = snap_addr;
-		'b01X_X_XX: ram_addr = ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
+		'b01X_X_XX: ram_addr = load_addr;
 		'b001_X_XX: ram_addr = tape_addr;
 		'b000_0_00: ram_addr = { 3'b101, page_rom,    addr[13:0]}; //ROM
 		'b000_0_01: ram_addr = {        3'd5,         addr[13:0]}; //Non-special page modes
@@ -527,8 +520,8 @@ sdram ram
 	.dout(ram_dout),
 	.din (ram_din),
 	.addr(ram_addr),
-	.wtbt(0),
-	.we(ram_we),
+	.word(0),
+	.wr(ram_we),
 	.rd(ram_rd),
 	.ready(ram_ready)
 );
@@ -664,11 +657,24 @@ reg         psg_active;
 
 wire        aud_reset = reset | psg_reset;
 
+(* direct_enable *) reg  ce_ym;  //3.5MHz
+always @(posedge clk_aud) begin
+	reg [3:0] counter = 0;
+	reg p1,p2,p3;
+	
+	p1 <= pause;
+	p2 <= p1;
+	p3 <= p2;
+
+	counter <=  counter + 1'd1;
+	ce_ym   <= !counter & ~p3;
+end
+
 // Turbosound FM: dual YM2203 chips
 turbosound turbosound
 (
 	.RESET(aud_reset),
-	.CLK(clk_ym),
+	.CLK(clk_aud),
 	.CE(ce_ym),
 	.BDIR(psg_we),
 	.BC(addr[14]),
@@ -679,11 +685,11 @@ turbosound turbosound
 );
 
 reg  ce_saa;  //8MHz
-always @(negedge clk_sys) begin
+always @(posedge clk_aud) begin
 	reg [3:0] counter = 0;
 
 	counter <=  counter + 1'd1;
-	if(counter == 13) counter <= 0;
+	if(counter == 6) counter <= 0;
 	
 	ce_saa <= !counter;
 end
@@ -693,7 +699,7 @@ wire [7:0] saa_r;
 
 saa1099 saa1099
 (
-	.clk_sys(clk_sys),
+	.clk_sys(clk_aud),
 	.ce(ce_saa),
 	.rst_n(~aud_reset),
 	.cs_n((addr[7:0] != 255) | nIORQ | ulap_tmx_ena[1]),
@@ -707,11 +713,14 @@ saa1099 saa1099
 wire [7:0] gs_dout;
 wire [14:0] gs_l, gs_r;
 
+reg ce_gs = 0;
+always @(posedge clk_aud) ce_gs <= ~ce_gs;
+
 gs gs
 (
 	.RESET(aud_reset),
-	.CLK(clk_sys),
-	.CE(ce_28m),
+	.CLK(clk_aud),
+	.CE(ce_gs),
 
 	.A(addr[3]),
 	.DI(cpu_dout),
@@ -764,8 +773,11 @@ ddram ddram
 
 wire gs_sel = (addr[7:0] ==? 'b1011?011) & ~&status[21:20];
 
-wire [11:0] audio_l = ts_l + {{3{gs_l[14]}}, gs_l[13:5]} + {2'b00, saa_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
-wire [11:0] audio_r = ts_r + {{3{gs_r[14]}}, gs_r[13:5]} + {2'b00, saa_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+reg [11:0] audio_l, audio_r;
+always @(posedge clk_aud) begin
+	audio_l <= ts_l + {{3{gs_l[14]}}, gs_l[13:5]} + {2'b00, saa_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+	audio_r <= ts_r + {{3{gs_r[14]}}, gs_r[13:5]} + {2'b00, saa_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+end
 
 compressor compressor
 (
@@ -796,7 +808,7 @@ end
 wire [1:0] scale = status[16:15];
 assign VGA_SL = {scale==3, scale==2};
 
-video video(.*, .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
+video video(.*, .clk_vid(CLK_VIDEO), .ce_pix(CE_PIXEL), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
 
 reg new_vmode = 0;
 always @(posedge clk_sys) begin

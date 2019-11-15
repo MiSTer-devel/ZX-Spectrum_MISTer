@@ -29,10 +29,10 @@ module video
 	input         reset,
 
 	input         clk_sys,
+	input         clk_vid,
 
 	input         ce_7mp,
 	input         ce_7mn,
-	input         ce_28m,
 	output reg    ce_cpu_sp,
 	output reg    ce_cpu_sn,
 	
@@ -45,7 +45,7 @@ module video
 	input         nIORQ,
 	input         nRFSH,
 	input         nWR,
-	output        nINT,
+	output reg    nINT,
 
 	// VRAM interfacing
 	output [14:0] vram_addr,
@@ -227,12 +227,25 @@ always_comb casex({HBlank | VSync, ulap_ena, ulap_mono})
 	'b011: {Gx,Rx,Bx} <= {color, 4'b0000};
 endcase
 
-video_mixer #(.LINE_LENGTH(896), .GAMMA(1)) video_mixer
+wire ce_sys = ce_7mp | (mode512 & ce_7mn);
+reg [1:0] ce_sys2;
+always @(posedge clk_sys) ce_sys2 <= {ce_sys2[0],ce_sys};
+
+reg ce_vid;
+always @(posedge clk_vid) begin
+	reg ce1, ce2, ce3;
+	
+	ce1 <= |ce_sys2;
+	ce2 <= ce1;
+	ce3 <= ce2;
+	ce_vid <= ce3;
+end
+
+video_mixer #(.LINE_LENGTH(896), .HALF_DEPTH(1), .GAMMA(1)) video_mixer
 (
 	.*,
 
-	.clk_vid(clk_sys),
-	.ce_pix(ce_7mp | (mode512 & ce_7mn)),
+	.ce_pix(ce_vid),
 	.ce_pix_out(ce_pix),
 
 	.hq2x(scale == 1),
@@ -255,9 +268,9 @@ wire ioreq_n    = (addr[0] & ~ulap_acc) | nIORQ;
 wire ulaContend = (hc[2] | hc[3]) & ~Border & CPUClk & ioreqtw3;
 wire memContend = nRFSH & ioreq_n & mreqt23 & ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
 wire ioContend  = ~ioreq_n;
-wire next_clk   = ~hc[0] | (mZX & ulaContend & (memContend | ioContend));
+wire next_clk   = hc[0] | (mZX & ulaContend & (memContend | ioContend));
 
-always @(negedge clk_sys) begin
+always @(posedge clk_sys) begin
 	ce_cpu_sp <= 0;
 	ce_cpu_sn <= 0;
 	if(ce_7mp) begin

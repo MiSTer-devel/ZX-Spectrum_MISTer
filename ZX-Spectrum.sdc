@@ -1,7 +1,11 @@
 
 # Effective clock is only half of the system clock, so allow 2 clock cycles for the paths in the T80 cpu
-set_multicycle_path -from {emu:emu|T80pa:cpu|T80:u0|*} -setup 2
-set_multicycle_path -from {emu:emu|T80pa:cpu|T80:u0|*} -hold 1
+set_multicycle_path -from {emu|cpu|u0|*} -setup 2
+set_multicycle_path -from {emu|cpu|u0|*} -hold 1
+
+set_multicycle_path -from {emu|gs|cpu|u0|*} -setup 2
+set_multicycle_path -from {emu|gs|cpu|u0|*} -hold 1
+
 
 # The CE is only active in every 2 clocks, so allow 2 clock cycles
 set_multicycle_path -to {emu:emu|smart_tape:tape|tape:tape|size[*]} -setup 2
@@ -61,3 +65,12 @@ set_multicycle_path -to {emu:emu|u765:u765|status[*]} -setup 2
 set_multicycle_path -to {emu:emu|u765:u765|status[*]} -hold 1
 set_multicycle_path -to {emu:emu|u765:u765|i_rpm_time[*][*][*]} -setup 8
 set_multicycle_path -to {emu:emu|u765:u765|i_rpm_time[*][*][*]} -hold 7
+
+set_false_path -from {emu|init_reset}
+set_false_path -from {emu|hps_io|cfg*}
+set_false_path -from {emu|hps_io|status*}
+set_false_path -from {emu|arch_reset}
+set_false_path -from {emu|snap_loader|snap_reset}
+set_false_path -from {emu|kbd|Fn*}
+set_false_path -from {emu|kbd|mod*}
+set_false_path -from {emu|plus3}
