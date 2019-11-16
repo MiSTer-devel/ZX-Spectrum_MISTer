@@ -465,7 +465,6 @@ end
 
 
 //////////////////   MEMORY   //////////////////
-wire        dma = (reset | ~nBUSACK) & ~nBUSRQ;
 reg  [24:0] ram_addr;
 reg   [7:0] ram_din;
 reg         ram_we;
@@ -476,8 +475,11 @@ wire        ram_ready;
 reg [24:0] load_addr;
 always @(posedge clk_sys) load_addr <= ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
 
+reg load;
+always @(posedge clk_sys) load <= (reset | ~nBUSACK) & ~nBUSRQ;
+
 always_comb begin
-	casex({snap_reset, dma, tape_req, page_special, addr[15:14]})
+	casex({snap_reset, load, tape_req, page_special, addr[15:14]})
 		'b1XX_X_XX: ram_addr = snap_addr;
 		'b01X_X_XX: ram_addr = load_addr;
 		'b001_X_XX: ram_addr = tape_addr;
@@ -491,20 +493,20 @@ always_comb begin
 		'b000_1_11: ram_addr = { ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
 	endcase
 
-	casex({snap_reset, dma, tape_req})
+	casex({snap_reset, load, tape_req})
 		'b1XX: ram_din = snap_data;
 		'b01X: ram_din = ioctl_dout;
 		'b001: ram_din = 0;
 		'b000: ram_din = cpu_dout;
 	endcase
 
-	casex({dma, tape_req})
+	casex({load, tape_req})
 		'b1X: ram_rd = 0;
 		'b01: ram_rd = ~nMREQ;
 		'b00: ram_rd = ~nMREQ & ~nRD;
 	endcase
 
-	casex({snap_reset, dma, tape_req})
+	casex({snap_reset, load, tape_req})
 		'b1XX: ram_we = snap_wr;
 		'b01X: ram_we = ioctl_wr;
 		'b001: ram_we = 0;

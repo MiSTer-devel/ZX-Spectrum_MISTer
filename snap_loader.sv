@@ -187,7 +187,7 @@ reg   [7:0] snap_7ffd;
 
 always_comb begin
 	addr = addr_pre;
-	if(snap_hdrlen == 30) begin
+	if(hdrv1) begin
 		case(addr_pre[17:14])
 				0: addr[16:14] = 5;
 				1: addr[16:14] = 2;
@@ -197,6 +197,7 @@ always_comb begin
 	end
 end
 
+reg        hdrv1;
 reg  [7:0] snap_hdrlen;
 reg [24:0] addr_pre;
 always_ff @(posedge clk_sys) begin
@@ -212,6 +213,8 @@ always_ff @(posedge clk_sys) begin
 	reg [7:0] cnt;
 	reg       finish;
 	reg [1:0] hold = 0;
+	
+	hdrv1 <= (snap_hdrlen == 30);
 
 	snap_wr <= 0;
 	old_download <= ioctl_download;

@@ -24,6 +24,8 @@ set_multicycle_path -to {emu:emu|smart_tape:tape|tape:tape|blk_list[*]} -setup 2
 set_multicycle_path -to {emu:emu|smart_tape:tape|tape:tape|blk_list[*]} -hold 1
 set_multicycle_path -to {emu:emu|smart_tape:tape|tape:tape|bitcnt[*]} -setup 2
 set_multicycle_path -to {emu:emu|smart_tape:tape|tape:tape|bitcnt[*]} -hold 1
+set_multicycle_path -from {emu:emu|smart_tape:tape|tape:tape|rd_req} -setup 2
+set_multicycle_path -from {emu:emu|smart_tape:tape|tape:tape|rd_req} -hold 1
 
 # The effective clock fo the AY chips are 112/1.75=64 cycles, so allow at least 2 cycles for the paths
 set_multicycle_path -to {emu:emu|turbosound:turbosound|*} -setup 4
@@ -38,9 +40,12 @@ set_multicycle_path -to {emu:emu|saa1099:saa1099|*} -hold 7
 
 set_multicycle_path -from {emu:emu|wd1793:fdd|wd1793_dpram:sbuf|*} -setup 2
 set_multicycle_path -from {emu:emu|wd1793:fdd|wd1793_dpram:sbuf|*} -hold 1
-
 set_multicycle_path -from {emu:emu|wd1793:fdd|altsyncram:edsk_rtl_0|*} -setup 2
 set_multicycle_path -from {emu:emu|wd1793:fdd|altsyncram:edsk_rtl_0|*} -hold 1
+set_multicycle_path -from {emu:emu|wd1793:fdd|layout_r*} -setup 2
+set_multicycle_path -from {emu:emu|wd1793:fdd|layout_r*} -hold 1
+set_multicycle_path -from {emu:emu|wd1793:fdd|disk_track*} -setup 2
+set_multicycle_path -from {emu:emu|wd1793:fdd|disk_track*} -hold 1
 
 set_multicycle_path -to {emu:emu|wd1793:fdd|state[*]} -setup 2
 set_multicycle_path -to {emu:emu|wd1793:fdd|state[*]} -hold 1
