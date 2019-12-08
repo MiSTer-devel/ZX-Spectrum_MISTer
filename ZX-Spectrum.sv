@@ -475,7 +475,11 @@ reg [24:0] load_addr;
 always @(posedge clk_sys) load_addr <= ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
 
 reg load;
-always @(posedge clk_sys) load <= (reset | ~nBUSACK) & ~nBUSRQ;
+always @(posedge clk_sys) begin
+	reg load1;
+	load1 <= (reset | ~nBUSACK) & ~nBUSRQ;
+	load <= load1;
+end
 
 always_comb begin
 	casex({snap_reset, load, tape_req, page_special, addr[15:14]})
