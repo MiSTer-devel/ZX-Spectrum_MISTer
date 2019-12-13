@@ -475,11 +475,7 @@ reg [24:0] load_addr;
 always @(posedge clk_sys) load_addr <= ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : 25'h150000);
 
 reg load;
-always @(posedge clk_sys) begin
-	reg load1;
-	load1 <= (reset | ~nBUSACK) & ~nBUSRQ;
-	load <= load1;
-end
+always @(posedge clk_sys) load <= (reset | ~nBUSACK) & ~nBUSRQ;
 
 always_comb begin
 	casex({snap_reset, load, tape_req, page_special, addr[15:14]})
@@ -745,8 +741,6 @@ gs gs
 	.OUTR(gs_r)
 );
 
-assign DDRAM_CLK = clk_sys;
-
 wire [20:0] gs_mem_addr;
 wire  [7:0] gs_mem_dout;
 wire  [7:0] gs_mem_din;
@@ -764,6 +758,7 @@ always_comb begin
 	endcase
 end
 
+assign DDRAM_CLK = clk_aud;
 ddram ddram
 (
 	.*,
@@ -786,7 +781,7 @@ end
 
 compressor compressor
 (
-	clk_sys,
+	clk_aud,
 	audio_l, audio_r,
 	AUDIO_L, AUDIO_R
 );
@@ -966,7 +961,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-wd1793 #(1) fdd
+wd1793 #(1) wd1793
 (
 	.clk_sys(clk_sys),
 	.ce(ce_wd1793),
