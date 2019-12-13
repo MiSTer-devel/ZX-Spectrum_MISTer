@@ -521,8 +521,7 @@ sdram ram
 	.dout(ram_dout),
 	.din (ram_din),
 	.addr(ram_addr),
-	.word(0),
-	.wr(ram_we),
+	.we(ram_we),
 	.rd(ram_rd),
 	.ready(ram_ready)
 );
