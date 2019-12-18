@@ -8,8 +8,6 @@ create_clock -period "100.0 MHz" [get_pins -compatibility_mode spi|sclk_out] -na
 derive_pll_clocks
 derive_clock_uncertainty
 
-set_output_delay -source_latency_included -12.0ns -clock {pll_hdmi|pll_hdmi_inst|altera_pll_i|*[0].*|divclk} [get_ports {HDMI_TX_CLK HDMI_TX_HS HDMI_TX_VS HDMI_TX_D*}]
-
 # Decouple different clock groups (to simplify routing)
 set_clock_groups -exclusive \
    -group [get_clocks { *|pll|pll_inst|altera_pll_i|*[*].*|divclk}] \

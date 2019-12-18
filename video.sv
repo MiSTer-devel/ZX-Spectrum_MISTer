@@ -111,38 +111,38 @@ always @(posedge clk_sys) begin
 	if(ce_7mn) begin
 		sync <= 0;
 		if(!mZX) begin
-			if(hc == 312) HBlank <= 1;
+			if(hc == 312) HBlank1<= 1;
 			if(hc == 338) sync   <= 1;
-			if(hc == 370) HSync  <= 0;
-			if(hc == 420) HBlank <= 0;
+			if(hc == 370) HSync1 <= 0;
+			if(hc == 420) HBlank1<= 0;
 		end else if(m128) begin
-			if(hc == 312) HBlank <= 1;
+			if(hc == 312) HBlank1<= 1;
 			if(hc == 340) sync   <= 1; //ULA 6C
-			if(hc == 372) HSync  <= 0; //ULA 6C
-			if(hc == 424) HBlank <= 0;
+			if(hc == 372) HSync1 <= 0; //ULA 6C
+			if(hc == 424) HBlank1<= 0;
 		end else begin
-			if(hc == 300) HBlank <= 1;
+			if(hc == 300) HBlank1<= 1;
 			if(hc == 336) sync   <= 1; //ULA 5C
-			if(hc == 368) HSync  <= 0; //ULA 5C
-			if(hc == 428) HBlank <= 0;
+			if(hc == 368) HSync1 <= 0; //ULA 5C
+			if(hc == 428) HBlank1<= 0;
 		end
 
-		if(wide) HBlank <= !(hc < 312 || hc >= ((mZX && m128) ? 455-33 : 447-33));
+		if(wide) HBlank1 <= !(hc < 312 || hc >= ((mZX && m128) ? 455-33 : 447-33));
 
 		if(sync) begin
-			HSync <= 1;
+			HSync1 <= 1;
 			if(mZX) begin
-				if(vc == 236) VBlank <= 1;
-				if(vc == 240) VSync  <= 1;
-				if(vc == 244) VSync  <= 0;
-				if(vc == 264) VBlank <= 0;
+				if(vc == 236) VBlank1<= 1;
+				if(vc == 240) VSync1 <= 1;
+				if(vc == 244) VSync1 <= 0;
+				if(vc == 264) VBlank1<= 0;
 			end else begin
-				if(vc == 236) VBlank <= 1;
-				if(vc == 248) VSync  <= 1;
-				if(vc == 256) VSync  <= 0;
-				if(vc == 272) VBlank <= 0;
+				if(vc == 236) VBlank1<= 1;
+				if(vc == 248) VSync1 <= 1;
+				if(vc == 256) VSync1 <= 0;
+				if(vc == 272) VBlank1<= 0;
 			end
-			if(wide) VBlank <= !(vc < (193) || vc >= (!mZX ? 319-4 : m128 ? 310-4 : 311-4));
+			if(wide) VBlank1 <= !(vc < (193) || vc >= (!mZX ? 319-4 : m128 ? 310-4 : 311-4));
 		end
 
 		if( mZX && (vc == 248) && (hc == (m128 ? 8 : 4))) INT <= 1;
@@ -192,10 +192,10 @@ wire [7:0] hipalette[8] = '{8'b01111000, 8'b01110001, 8'b01101010, 8'b01100011,
 reg        INT    = 0;
 reg  [5:0] INTCnt = 1;
 reg  [7:0] ff_data;
-reg        HBlank = 1;
-reg        VBlank = 1;
-reg        HSync;
-reg        VSync;
+reg        HBlank, HBlank1;
+reg        VBlank, VBlank1;
+reg        HSync, HSync1;
+reg        VSync, VSync1;
 
 reg  [7:0] SRegister;
 reg [15:0] hiSRegister;
@@ -219,26 +219,30 @@ wire       Pixel = tmx_hi ? hiSRegister[15] : SRegister[7] ^ (AttrOut[7] & Flash
 assign     {I,G,R,B} = Pixel ? {AttrOut[6],AttrOut[2:0]} : {AttrOut[6],AttrOut[5:3]};
 wire [7:0] color = palette[(tmx_hi ? hiSRegister[15] : SRegister[7]) ? {AttrOut[7:6],1'b0,AttrOut[2:0]} : {AttrOut[7:6],1'b1,AttrOut[5:3]}];
 
-reg  [3:0] Rx, Gx, Bx;
-always_comb casex({HBlank | VSync, ulap_ena, ulap_mono})
-	'b1XX: {Gx,Rx,Bx} <= 0;
-	'b00X: {Gx,Rx,Bx} <= {G, {3{I & G}}, R, {3{I & R}}, B, {3{I & B}}};
-	'b010: {Gx,Rx,Bx} <= {color[7:5], color[7], color[4:2], color[4], color[1:0], color[1:0]};
-	'b011: {Gx,Rx,Bx} <= {color, 4'b0000};
-endcase
+always @(posedge clk_sys) begin
+	if(ce_sys) begin
+		casex({HBlank1 | VSync1, ulap_ena, ulap_mono})
+			'b1XX: {Gx,Rx,Bx} <= 0;
+			'b00X: {Gx,Rx,Bx} <= {G, {3{I & G}}, R, {3{I & R}}, B, {3{I & B}}};
+			'b010: {Gx,Rx,Bx} <= {color[7:5], color[7], color[4:2], color[4], color[1:0], color[1:0]};
+			'b011: {Gx,Rx,Bx} <= {color, 4'b0000};
+		endcase
+		
+		{HBlank, VBlank, HSync, VSync} <= {HBlank1, VBlank1, HSync1, VSync1};
+	end
+end
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg [1:0] ce_sys2;
 always @(posedge clk_sys) ce_sys2 <= {ce_sys2[0],ce_sys};
 
 reg ce_vid;
+reg [3:0] Rx, Gx, Bx;
 always @(posedge clk_vid) begin
-	reg ce1, ce2, ce3;
+	reg ce1;
 	
 	ce1 <= |ce_sys2;
-	ce2 <= ce1;
-	ce3 <= ce2;
-	ce_vid <= ce3;
+	ce_vid <= ce1;
 end
 
 video_mixer #(.LINE_LENGTH(896), .HALF_DEPTH(1), .GAMMA(1)) video_mixer

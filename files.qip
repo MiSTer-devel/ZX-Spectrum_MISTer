@@ -1,6 +1,5 @@
 set_global_assignment -name QIP_FILE t80/T80.qip
 set_global_assignment -name QIP_FILE jt12/jt03.qip
-set_global_assignment -name SDC_FILE "ZX-Spectrum.sdc"
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE saa1099.sv
 set_global_assignment -name SYSTEMVERILOG_FILE turbosound.sv
@@ -17,4 +16,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE tape.sv
 set_global_assignment -name VHDL_FILE tzxplayer.vhd
 set_global_assignment -name VERILOG_FILE mouse.v
 set_global_assignment -name SYSTEMVERILOG_FILE keyboard.sv
+set_global_assignment -name SDC_FILE "ZX-Spectrum.sdc"
 set_global_assignment -name SYSTEMVERILOG_FILE "ZX-Spectrum.sv"

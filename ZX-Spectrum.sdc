@@ -23,6 +23,8 @@ set_multicycle_path -from {emu|wd1793|layout_r*} -setup 2
 set_multicycle_path -from {emu|wd1793|layout_r*} -hold 1
 set_multicycle_path -from {emu|wd1793|disk_track*} -setup 2
 set_multicycle_path -from {emu|wd1793|disk_track*} -hold 1
+set_multicycle_path -from {emu|wd1793|edsk_addr*} -setup 2
+set_multicycle_path -from {emu|wd1793|edsk_addr*} -hold 1
 set_multicycle_path -to   {emu|wd1793|state[*]} -setup 2
 set_multicycle_path -to   {emu|wd1793|state[*]} -hold 1
 set_multicycle_path -to   {emu|wd1793|wait_time[*]} -setup 2
