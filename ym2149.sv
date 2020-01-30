@@ -187,7 +187,7 @@ always @(posedge CLK) begin
 						tone_gen_cnt[i] <= tone_gen_cnt[i] + 1'd1;
 					end
 				end else begin
-					tone_gen_op[i] <= ymreg[7][i];
+					tone_gen_op[i] <= ~ymreg[7][i];
 					tone_gen_cnt[i] <= 0;
 				end
 			end
