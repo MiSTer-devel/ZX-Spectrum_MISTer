@@ -716,7 +716,7 @@ wire [14:0] gs_l, gs_r;
 reg ce_gs = 0;
 always @(posedge clk_aud) ce_gs <= ~ce_gs;
 
-gs gs
+gs #("rtl/gs105b.mif") gs
 (
 	.RESET(aud_reset),
 	.CLK(clk_aud),
