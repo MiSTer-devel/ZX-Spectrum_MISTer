@@ -171,7 +171,8 @@ localparam CONF_STR = {
 	"OD,Port #FF,Timex,SAA1099;",
 	"OE,ULA+,Enabled,Disabled;",
 	"OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
-	"D0R0,Reset & apply;",
+	"-;",
+	"R0,Reset & apply;",
 	"J,Fire 1,Fire 2;",
 	"V,v",`BUILD_DATE
 };
