@@ -270,7 +270,7 @@ reg  mreqt23;
 
 wire ioreq_n    = (addr[0] & ~ulap_acc) | nIORQ;
 wire ulaContend = (hc[2] | hc[3]) & ~Border & CPUClk & ioreqtw3;
-wire memContend = nRFSH & ioreq_n & mreqt23 & ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
+wire memContend = ioreq_n & mreqt23 & ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
 wire ioContend  = ~ioreq_n;
 wire next_clk   = hc[0] | (mZX & ulaContend & (memContend | ioContend));
 
