@@ -54,6 +54,11 @@ set_multicycle_path -to   {emu|u765|i_rpm_time[*][*][*]} -hold 7
 set_multicycle_path -from {emu|load} -setup 2
 set_multicycle_path -from {emu|load} -hold 1
 
+set_multicycle_path -to   {emu|turbosound|*} -setup 2
+set_multicycle_path -to   {emu|turbosound|*} -hold 1
+set_multicycle_path -to   {emu|saa1099|*} -setup 2
+set_multicycle_path -to   {emu|saa1099|*} -hold 1
+
 set_false_path -from {emu|init_reset}
 set_false_path -from {emu|hps_io|cfg*}
 set_false_path -from {emu|hps_io|status*}
