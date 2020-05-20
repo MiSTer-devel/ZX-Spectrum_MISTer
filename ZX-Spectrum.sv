@@ -781,18 +781,33 @@ ddram ddram
 
 wire gs_sel = (addr[7:0] ==? 'b1011?011) & ~&status[21:20];
 
-reg [11:0] audio_l, audio_r;
+localparam [3:0] comp_f = 4;
+localparam [3:0] comp_a = 2;
+localparam       comp_x = ((32767 * (comp_f - 1)) / ((comp_f * comp_a) - 1)) + 1; // +1 to make sure it won't overflow
+localparam       comp_b = comp_x * comp_a;
+
+function [15:0] compr; input [15:0] inp;
+	reg [15:0] v, v2;
+	begin
+		v  = inp[15] ? (~inp) + 1'd1 : inp;
+		v2 = (v < comp_x[15:0]) ? (v * comp_a) : (((v - comp_x[15:0])/comp_f) + comp_b[15:0]);
+		compr = inp[15] ? ~(v2-1'd1) : v2;
+	end
+endfunction
+
+reg [15:0] audio_l, audio_r;
 always @(posedge clk_aud) begin
-	audio_l <= ts_l + {{3{gs_l[14]}}, gs_l[13:5]} + {2'b00, saa_l, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
-	audio_r <= ts_r + {{3{gs_r[14]}}, gs_r[13:5]} + {2'b00, saa_r, 2'b00} + {3'b000, ear_out, mic_out, tape_in, 6'b000000};
+	reg [15:0] pre_l, pre_r;
+	pre_l <= {ts_l,4'd0} + {{3{gs_l[14]}}, gs_l[13:1]} + {2'b00, saa_l, 6'd0} + {3'b000, ear_out, mic_out, tape_in, 10'd0};
+	pre_r <= {ts_r,4'd0} + {{3{gs_r[14]}}, gs_r[13:1]} + {2'b00, saa_r, 6'd0} + {3'b000, ear_out, mic_out, tape_in, 10'd0};
+
+	audio_l <= compr(pre_l);
+	audio_r <= compr(pre_r);
 end
 
-compressor compressor
-(
-	clk_aud,
-	audio_l, audio_r,
-	AUDIO_L, AUDIO_R
-);
+assign AUDIO_L = audio_l;
+assign AUDIO_R = audio_r;
+
 
 ////////////////////   VIDEO   ///////////////////
 wire        ce_cpu_sn;

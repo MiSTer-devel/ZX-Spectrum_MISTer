@@ -5,7 +5,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/saa1099.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/turbosound.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ym2149.sv
 set_global_assignment -name VERILOG_FILE rtl/gs.v
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/compressor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/snap_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/u765.sv
