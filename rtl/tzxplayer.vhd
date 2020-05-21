@@ -13,13 +13,27 @@ use ieee.numeric_std.all;
 
 entity tzxplayer is
 generic (
-	TZX_MS : integer := 64000       -- CE periods for one milliseconds
+	TZX_MS : integer := 64000;       -- CE periods for one milliseconds
+	-- Default: ZX Spectrum
+	NORMAL_PILOT_LEN    : integer := 2168;
+	NORMAL_SYNC1_LEN    : integer := 667;
+	NORMAL_SYNC2_LEN    : integer := 735;
+	NORMAL_ZERO_LEN     : integer := 855;
+	NORMAL_ONE_LEN      : integer := 1710;
+	NORMAL_PILOT_PULSES : integer := 4031
+
+	-- Amstrad CPC
+	--NORMAL_PILOT_LEN    : integer := 2000;
+	--NORMAL_SYNC1_LEN    : integer := 855;
+	--NORMAL_SYNC2_LEN    : integer := 855;
+	--NORMAL_ZERO_LEN     : integer := 855;
+	--NORMAL_ONE_LEN      : integer := 1710;
+	--NORMAL_PILOT_PULSES : integer := 4096;
 );
 port(
 	clk             : in std_logic;
 	ce              : in std_logic;
-	restart_tape    : in std_logic; -- keep to 1 to long enough to clear fifo
-	                                -- reset tap header bytes skip counter
+	restart_tape    : in std_logic;
 
 	host_tap_in     : in std_logic_vector(7 downto 0);  -- 8bits fifo input
 	tzx_req         : buffer std_logic;                 -- request for new byte (edge trigger)
@@ -36,21 +50,6 @@ end tzxplayer;
 
 architecture struct of tzxplayer is
 
--- ZX Spectrum
-constant NORMAL_PILOT_LEN    : integer := 2168;
-constant NORMAL_SYNC1_LEN    : integer := 667;
-constant NORMAL_SYNC2_LEN    : integer := 735;
-constant NORMAL_ZERO_LEN     : integer := 855;
-constant NORMAL_ONE_LEN      : integer := 1710;
-constant NORMAL_PILOT_PULSES : integer := 4031;
-
--- Amstrad CPC
---constant NORMAL_PILOT_LEN    : integer := 2000;
---constant NORMAL_SYNC1_LEN    : integer := 855;
---constant NORMAL_SYNC2_LEN    : integer := 855;
---constant NORMAL_ZERO_LEN     : integer := 855;
---constant NORMAL_ONE_LEN      : integer := 1710;
---constant NORMAL_PILOT_PULSES : integer := 4096;
 
 signal tap_fifo_do    : std_logic_vector(7 downto 0);
 signal tick_cnt       : std_logic_vector(16 downto 0);
@@ -85,7 +84,10 @@ type tzx_state_t is (
 	TZX_PLAY_TAPBLOCK,
 	TZX_PLAY_TAPBLOCK2,
 	TZX_PLAY_TAPBLOCK3,
-	TZX_PLAY_TAPBLOCK4);
+	TZX_PLAY_TAPBLOCK4,
+	TZX_DIRECT,
+	TZX_DIRECT2,
+	TZX_DIRECT3);
 
 signal tzx_state: tzx_state_t;
 
@@ -191,7 +193,7 @@ begin
 					when x"12" => tzx_state <= TZX_TONE;
 					when x"13" => tzx_state <= TZX_PULSES;
 					when x"14" => tzx_state <= TZX_DATA;
-					when x"15" => null; -- Direct Recoding Block (not implemented)
+					when x"15" => tzx_state <= TZX_DIRECT;
 					when x"18" => null; -- CSW recording (not implemented)
 					when x"19" => null; -- Generalized data block (not implemented)
 					when x"20" => tzx_state <= TZX_PAUSE;
@@ -246,7 +248,16 @@ begin
 
 			when TZX_PAUSE2 =>
 				tzx_req <= tzx_ack; -- don't request new byte
-				if ms_counter /= 0 then if ce = '1' then ms_counter <= ms_counter - 1; end if;
+				if ms_counter /= 0 then
+					if ce = '1' then
+						ms_counter <= ms_counter - 1;
+						-- Set pulse level to low after 1 ms
+						if ms_counter = 1 then
+							wave_period <= '0';
+							end_period <= '0';
+							cass_read <= '0';
+						end if;
+					end if;
 				elsif pause_len /= 0 then
 					pause_len <= pause_len - 1;
 					ms_counter <= conv_std_logic_vector(TZX_MS, 16);
@@ -469,6 +480,41 @@ begin
 			when TZX_PLAY_TAPBLOCK4 =>
 				tzx_req <= tzx_ack; -- don't request new byte
 				tzx_state <= TZX_PLAY_TAPBLOCK2;
+
+			when TZX_DIRECT =>
+				tzx_offset <= tzx_offset + 1;
+				if    tzx_offset = x"00" then zero_l    ( 7 downto  0) <= tap_fifo_do; -- here this is used for one bit, too
+				elsif tzx_offset = x"01" then zero_l    (15 downto  8) <= tap_fifo_do;
+				elsif tzx_offset = x"02" then pause_len ( 7 downto  0) <= tap_fifo_do;
+				elsif tzx_offset = x"03" then pause_len (15 downto  8) <= tap_fifo_do;
+				elsif tzx_offset = x"04" then last_byte_bits <= tap_fifo_do(3 downto 0);
+				elsif tzx_offset = x"05" then data_len( 7 downto  0) <= tap_fifo_do;
+				elsif tzx_offset = x"06" then data_len(15 downto  8) <= tap_fifo_do;
+				elsif tzx_offset = x"07" then 
+					data_len(23 downto 16) <= tap_fifo_do;
+					tzx_state <= TZX_DIRECT2;
+					bit_cnt <= "111";
+				end if;
+
+			when TZX_DIRECT2 =>
+				tzx_req <= tzx_ack; -- don't request new byte
+				bit_cnt <= bit_cnt - 1;
+				if bit_cnt = "000" or (data_len = 1 and ((bit_cnt = (8 - last_byte_bits)) or (last_byte_bits = 0))) then
+					data_len <= data_len - 1;
+					tzx_state <= TZX_DIRECT3;
+				end if;
+
+				pulse_len <= zero_l;
+				cass_read <= tap_fifo_do(CONV_INTEGER(bit_cnt));
+				wave_period <= tap_fifo_do(CONV_INTEGER(bit_cnt));
+				end_period <= tap_fifo_do(CONV_INTEGER(bit_cnt));
+
+			when TZX_DIRECT3 =>
+				if data_len = 0 then
+					tzx_state <= TZX_PAUSE2;
+				else
+					tzx_state <= TZX_DIRECT2;
+				end if;
 
 			when others => null;
 			end case;
