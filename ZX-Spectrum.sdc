@@ -8,8 +8,11 @@ set_multicycle_path -from [get_clocks $clk_56m] -to [get_clocks $clk_sys] -setup
 set_multicycle_path -from [get_clocks $clk_56m] -to [get_clocks $clk_sys] -hold 1
 
 # Effective clock is only half of the system clock, so allow 2 clock cycles for the paths in the T80 cpu
-set_multicycle_path -from {emu|cpu|u0|*} -setup 2
-set_multicycle_path -from {emu|cpu|u0|*} -hold 1
+set_multicycle_path -from {emu|cpu|*} -setup 2
+set_multicycle_path -from {emu|cpu|*} -hold 1
+
+set_multicycle_path -to   {emu|cpu|*} -setup 2
+set_multicycle_path -to   {emu|cpu|*} -hold 1
 
 # The CE is only active in every 2 clocks, so allow 2 clock cycles
 set_multicycle_path -from {emu|tape|*} -setup 2
@@ -70,3 +73,4 @@ set_false_path -from {emu|plus3}
 set_false_path -from {emu|zx48}
 set_false_path -from {emu|p1024}
 set_false_path -from {emu|pf1024}
+set_false_path -from {emu|hps_io|status[*]}
