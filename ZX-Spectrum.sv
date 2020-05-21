@@ -734,7 +734,7 @@ gs #("rtl/gs105b.mif") gs
 	.A(addr[3]),
 	.DI(cpu_dout),
 	.DO(gs_dout),
-	.CS_n(nIORQ | ~gs_sel),
+	.CS_n(~nM1 | nIORQ | ~gs_sel),
 	.WR_n(nWR),
 	.RD_n(nRD),
 
@@ -1033,6 +1033,7 @@ u765 #(20'd1800,1) u765
 	.ready(plus3_fdd_ready),
 	.motor(motor_plus3),
 	.available(2'b01),
+	.fast(1),
 	.nRD(~plus3_fdd | nIORQ | ~nM1 | nRD),
 	.nWR(~plus3_fdd | nIORQ | ~nM1 | nWR),
 	.din(cpu_dout),

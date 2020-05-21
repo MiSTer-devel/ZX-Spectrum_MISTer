@@ -37,6 +37,7 @@ module u765 #(parameter CYCLES = 20'd4000, SPECCY_SPEEDLOCK_HACK = 0)
 	input      [1:0] ready,     // disk is inserted in MiST(er)
 	input      [1:0] motor,     // drive motor
 	input      [1:0] available, // drive available (fake ready signal for SENSE DRIVE command)
+	input            fast,      // "Fast" mode - immediate seek and sector read/write
 	input            a0,
 	input            nRD,       // i/o read
 	input            nWR,       // i/o write
@@ -57,7 +58,7 @@ module u765 #(parameter CYCLES = 20'd4000, SPECCY_SPEEDLOCK_HACK = 0)
 );
 
 //localparam OVERRUN_TIMEOUT = 26'd35000000;
-localparam OVERRUN_TIMEOUT = CYCLES;
+localparam OVERRUN_TIMEOUT = CYCLES * 8'd10;
 localparam [19:0] TRACK_TIME = CYCLES*8'd200;
 
 localparam UPD765_MAIN_D0B = 0;
@@ -384,12 +385,16 @@ always @(posedge clk_sys) begin
 					int_state[i_current_drive] <= 1;
 					seek_state[i_current_drive] <= 0;
 				end else begin
-					if (pcn[i_current_drive] > ncn[i_current_drive]) pcn[i_current_drive] <= pcn[i_current_drive] - 1'd1;
-					if (pcn[i_current_drive] < ncn[i_current_drive]) pcn[i_current_drive] <= pcn[i_current_drive] + 1'd1;
 					image_trackinfo_dirty[i_current_drive] <= 1;
-					i_step_state[i_current_drive] <= i_srt;
-					i_steptimer[i_current_drive] <= CYCLES;
-					seek_state[i_current_drive] <= 2;
+					if (fast) begin
+						pcn[i_current_drive] <= ncn[i_current_drive];
+					end else begin
+						if (pcn[i_current_drive] > ncn[i_current_drive]) pcn[i_current_drive] <= pcn[i_current_drive] - 1'd1;
+						if (pcn[i_current_drive] < ncn[i_current_drive]) pcn[i_current_drive] <= pcn[i_current_drive] + 1'd1;
+						i_step_state[i_current_drive] <= i_srt;
+						i_steptimer[i_current_drive] <= CYCLES;
+						seek_state[i_current_drive] <= 2;
+					end
 				end
 			2: if(i_steptimer[i_current_drive]) begin
 					i_steptimer[i_current_drive] <= i_steptimer[i_current_drive] - 1'd1;
@@ -410,10 +415,7 @@ always @(posedge clk_sys) begin
 						8'd0 : i_current_sector_pos[i_current_drive][i] + 1'd1;
 					i_rpm_timer[i_current_drive][i] <= 0;
 				end else begin
-					if(state != COMMAND_RW_DATA_EXEC5 &&
-						state != COMMAND_RW_DATA_EXEC6 &&
-						state != COMMAND_RW_DATA_EXEC7)
-						i_rpm_timer[i_current_drive][i] <= i_rpm_timer[i_current_drive][i] + 1'd1;
+					i_rpm_timer[i_current_drive][i] <= i_rpm_timer[i_current_drive][i] + 1'd1;
 				end
 			end
 		end
@@ -603,7 +605,7 @@ always @(posedge clk_sys) begin
 			end
 
 			COMMAND_READ_ID_WAIT_SECTOR:
-			if (~sd_busy & ~buff_wait & !i_rpm_timer[ds0][hds]) begin
+			if (~sd_busy & ~buff_wait & (!i_rpm_timer[ds0][hds] | fast)) begin
 				sd_buff_type <= UPD765_SD_BUFF_TRACKINFO;
 				buff_addr <= { image_track_offsets_in[0], 8'h18 + (i_current_sector_pos[ds0][hds] << 3) }; //get the current sectorInfo
 				buff_wait <= 1;
@@ -755,9 +757,11 @@ always @(posedge clk_sys) begin
 				state <= COMMAND_RW_DATA_EXEC3;
 			end
 
-			//wait for the sector needed for positioning at the head (after 1/4 of the sector start)
+			//wait for the sector needed for positioning at the head
 			COMMAND_RW_DATA_WAIT_SECTOR:
-			if ((i_current_sector_pos[ds0][hds] == i_current_sector - 1'd1) && (i_rpm_timer[ds0][hds] == 1)) begin
+			if (fast ||
+				((i_current_sector_pos[ds0][hds] == i_current_sector - 1'd1) &&
+				(i_rpm_timer[ds0][hds] == i_rpm_time[ds0][hds] >> 2 ))) begin
 				m_status[UPD765_MAIN_EXM] <= 1;
 				state <= COMMAND_RW_DATA_EXEC_WEAK;
 			end
@@ -783,7 +787,6 @@ always @(posedge clk_sys) begin
 					next_weak_sector[ds0] <= next_weak_sector[ds0] + 1'd1;
 				else
 					next_weak_sector[ds0] <= 0;
-				if (i_bytes_to_read > i_sector_size) i_bytes_to_read <= i_sector_size;
 				state <= COMMAND_RW_DATA_EXEC5;
 			end
 
@@ -810,7 +813,6 @@ always @(posedge clk_sys) begin
 						sd_busy <= 1;
 					end
 					state <= COMMAND_RW_DATA_EXEC8;
-					i_rpm_timer[ds0][hds] <= (i_rpm_time[ds0][hds]-(i_rpm_time[ds0][hds]>>2));					
 				end else if (!i_timeout) begin
 					m_status[UPD765_MAIN_EXM] <= 0;
 					status[0] <= 8'h40;
@@ -831,11 +833,14 @@ always @(posedge clk_sys) begin
 								i_sector_st1[5] & i_sector_st2[5] & !i_bytes_to_read[14:4]) ?
 						 buff_data_in << next_weak_sector[ds0] : buff_data_in;
 
-					buff_addr <= buff_addr + 1'd1;
-					buff_wait <= 1;
 					m_status[UPD765_MAIN_RQM] <= 0;
+					if (i_sector_size) begin
+						i_sector_size <= i_sector_size - 1'd1;
+						buff_addr <= buff_addr + 1'd1;
+						buff_wait <= 1;
+						i_seek_pos <= i_seek_pos + 1'd1;
+					end
 					i_bytes_to_read <= i_bytes_to_read - 1'd1;
-					i_seek_pos <= i_seek_pos + 1'd1;
 					i_timeout <= OVERRUN_TIMEOUT;
 				end else if (i_write & ~old_wr & wr & a0) begin
 					buff_wr <= 1;
@@ -851,9 +856,13 @@ always @(posedge clk_sys) begin
 			COMMAND_RW_DATA_EXEC7:
 			begin
 				buff_wr <= 0;
-				buff_addr <= buff_addr + 1'd1;
+				if (i_sector_size) begin
+					i_sector_size <= i_sector_size - 1'd1;
+					buff_addr <= buff_addr + 1'd1;
+					buff_wait <= 1;
+					i_seek_pos <= i_seek_pos + 1'd1;
+				end
 				i_bytes_to_read <= i_bytes_to_read - 1'd1;
-				i_seek_pos <= i_seek_pos + 1'd1;
 				if (&buff_addr) begin
 					//sector continues on the next LBA
 					//so write out the current before reading the next
