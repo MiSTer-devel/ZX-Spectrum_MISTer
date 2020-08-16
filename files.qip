@@ -9,7 +9,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/snap_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/u765.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ddram.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/video.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/ula.sv
 set_global_assignment -name VERILOG_FILE rtl/dpram.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/tape.sv
 set_global_assignment -name VHDL_FILE rtl/tzxplayer.vhd
