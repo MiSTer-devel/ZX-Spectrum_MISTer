@@ -66,7 +66,7 @@
 
 */
 
-module gs #(parameter ROMFILE="gs105b.mif")
+module gs #(parameter ROMFILE="gs105b.mif", CLK_RATE = 56000000)
 (
    input         RESET,
    input         CLK,
@@ -119,21 +119,23 @@ T80pa cpu
 	.DI(cpu_di_bus)
 );
 
-// INT#
+reg ce_37480;
 always @(posedge CLK) begin
-	reg [9:0] cnt;
-
-	if(CE) begin
-		cnt <= cnt + 1'b1;
-		if (cnt == 746) begin // 37.48kHz
-			cnt <= 0;
-			int_n <= 0;
-		end
+	reg [31:0] sum = 0;
+	
+	ce_37480 = 0;
+	sum = sum + 37480;
+	if(sum >= CLK_RATE) begin
+		sum = sum - CLK_RATE;
+		ce_37480 = 1;
 	end
-
-	if (~cpu_iorq_n & ~cpu_m1_n) int_n <= 1;
 end
 
+// INT#
+always @(posedge CLK) begin
+	if (ce_37480) int_n <= 0;
+	if (~cpu_iorq_n & ~cpu_m1_n) int_n <= 1;
+end
 
 reg bit7;
 reg bit0;
