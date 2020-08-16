@@ -32,10 +32,8 @@ always @(posedge clk_vid) begin
 	reg [7:0] R_gamma, G_gamma;
 	reg       hs,vs,hb,vb;
 	reg [1:0] ctr = 0;
-	reg       old_ce;
 
-	old_ce <= ce_pix;
-	if(~old_ce & ce_pix) begin
+	if(ce_pix) begin
 		{R_in,G_in,B_in} <= RGB_in;
 		hs <= HSync; vs <= VSync;
 		hb <= HBlank; vb <= VBlank;
@@ -106,10 +104,8 @@ always @(posedge clk_vid) begin
 	reg [7:0] R_in, G_in, B_in;
 	reg [7:0] R_gamma, G_gamma;
 	reg       hs,vs,hb,vb,de;
-	reg       old_ce;
 
-	old_ce <= ce_pix;
-	if(~old_ce & ce_pix) begin
+	if(ce_pix) begin
 		{gamma_index_r,gamma_index_g,gamma_index_b} <= RGB_in;
 		hs <= HSync; vs <= VSync;
 		hb <= HBlank; vb <= VBlank;
