@@ -241,7 +241,7 @@ endgenerate
 
 generate
     if( use_ssg==1 ) begin        
-        ym2149 u_psg
+        YM2149 u_psg
 		  (
            .CLK(clk),
            .CE(clk_en_ssg),

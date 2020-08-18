@@ -39,7 +39,7 @@
 //   1   1   set address
 //
 
-module ym2149
+module YM2149
 (
 	input        CLK,       // Global clock
 	input        CE,        // PSG Clock enable
@@ -112,8 +112,8 @@ always_comb begin
 			11: dout = ymreg[11];
 			12: dout = ymreg[12];
 			13: dout = ymreg[13][3:0];
-			14: dout = ymreg[7][6] ? ymreg[14] : IOA_in;
-			15: dout = ymreg[7][7] ? ymreg[15] : IOB_in;
+			14: dout = ymreg[7][6] ? ymreg[14] & IOA_in : IOA_in;
+			15: dout = ymreg[7][7] ? ymreg[15] & IOA_in : IOB_in;
 		endcase
 	end
 end
@@ -151,7 +151,7 @@ always @(posedge CLK) begin
 
 	if(CE) begin
 		if (ena_div_noise) begin
-			if (!ymreg[6][4:0] || noise_gen_cnt >= ymreg[6][4:0] - 1'd1) begin
+			if (!ymreg[6][4:0] || (noise_gen_cnt >= ymreg[6][4:0] - 1'd1)) begin
 				noise_gen_cnt <= 0;
 				poly17 <= {(poly17[0] ^ poly17[2] ^ !poly17), poly17[16:1]};
 			end else begin
@@ -179,16 +179,11 @@ always @(posedge CLK) begin
 	
 		for (i = 1; i <= 3; i = i + 1) begin
 			if(ena_div) begin
-				if (tone_gen_freq[i]) begin
-					if (tone_gen_cnt[i] >= (tone_gen_freq[i] - 1'd1)) begin
-						tone_gen_cnt[i] <= 0;
-						tone_gen_op[i]  <= ~tone_gen_op[i];
-					end else begin
-						tone_gen_cnt[i] <= tone_gen_cnt[i] + 1'd1;
-					end
-				end else begin
-					tone_gen_op[i] <= ~ymreg[7][i];
+				if (!tone_gen_freq[i] || (tone_gen_cnt[i] >= (tone_gen_freq[i] - 1'd1))) begin
 					tone_gen_cnt[i] <= 0;
+					tone_gen_op[i]  <= ~tone_gen_op[i];
+				end else begin
+					tone_gen_cnt[i] <= tone_gen_cnt[i] + 1'd1;
 				end
 			end
 		end
