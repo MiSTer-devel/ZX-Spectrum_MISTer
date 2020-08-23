@@ -40,8 +40,11 @@ module ULA
 	input         nMREQ,
 	input         nIORQ,
 	input         nRFSH,
+	input         nRD,
 	input         nWR,
 	output        nINT,
+	output        nPortRD,
+	output        nPortWR,
 
 	// VRAM interfacing
 	output [14:0] vram_addr,
@@ -80,6 +83,8 @@ module ULA
 assign vram_addr = vaddr;
 assign nINT      = ~INT;
 assign port_ff   = tmx_using_ff ? {2'b00, tmx_cfg} : mZX ? ff_data : 8'hFF;
+assign nPortRD   = addr[0] | nIORQ | ioreqtw3 | nRD;
+assign nPortWR   = addr[0] | nIORQ | ioreqtw3 | nWR;
 
 // Pixel clock
 reg  [8:0] hc = 0;
@@ -165,7 +170,7 @@ always @(posedge clk_sys) begin
 		if( mZX && (vc_next == 248) && (hc_next == (m128 ? 8 : 4))) INT <= 1;
 		if(!mZX && (vc_next == 239) && (hc_next == 326)) INT <= 1;
 
-		if(INT)  INTCnt <= INTCnt + 1'd1;
+		if(INT)  INTCnt <= ((m128 && INTCnt == 71) || (~m128 && INTCnt == 63)) ? 7'd0 : (INTCnt + 1'd1);
 		if(INTCnt == 0) INT <= 0;
 
 		if ((hc_next[3:0] == 4) || (hc_next[3:0] == 12)) begin
@@ -212,7 +217,7 @@ assign hipalette = '{8'b01111000, 8'b01110001, 8'b01101010, 8'b01100011,
                      8'b01011100, 8'b01010101, 8'b01001110, 8'b01000111};
 
 reg        INT    = 0;
-reg  [5:0] INTCnt = 1;
+reg  [6:0] INTCnt = 1;
 reg  [7:0] ff_data;
 
 reg  [7:0] SRegister;
@@ -239,7 +244,7 @@ reg  CPUClk;
 reg  ioreqtw3;
 reg  mreqt23;
 
-wire ioreq_n      = (addr[0] & ~ulap_acc) | nIORQ;
+wire ioreq_n      = (addr[0] & ~(ulap_acc & ulap_avail)) | nIORQ;
 wire clkwait_next = hc_next[2] | hc_next[3];
 wire ulaContend   = clkwait_next & ~Border_next & CPUClk & ioreqtw3;
 wire contendAddr  = ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
@@ -247,11 +252,14 @@ wire memContend   = ioreq_n & mreqt23 & contendAddr;
 wire ioContend    = ~ioreq_n;
 wire next_clk     = hc_next[0] | (mZX & ulaContend & (memContend | ioContend));
 
-assign ce_cpu_sp = ce_7mn & (~CPUClk &  next_clk);
-assign ce_cpu_sn = ce_7mn & ( CPUClk & ~next_clk);
+reg  next_clk_r;
+
+assign ce_cpu_sp = ce_7mn & (~CPUClk &  next_clk_r);
+assign ce_cpu_sn = ce_7mn & ( CPUClk & ~next_clk_r);
 
 always @(posedge clk_sys) begin
 	if(ce_7mn) CPUClk <= next_clk;
+	if(ce_7mp) next_clk_r <= next_clk;
 
 	if(~CPUClk) begin
 		// These are transparent latches!

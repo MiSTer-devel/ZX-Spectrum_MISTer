@@ -440,7 +440,7 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[7:0]==8'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
 		'b01XXXXXXXXX: cpu_din = tape_dout;
 		'b00XXXXXXXXX: cpu_din = ram_dout;
 		'b1X01XXXXXXX: cpu_din = fdd_dout;
@@ -644,11 +644,8 @@ reg       mic_out;
 
 wire ula_we = ~addr[0] & ~nIORQ & ~nWR & nM1;
 always @(posedge clk_sys) begin
-	reg old_we;
-	old_we <= ula_we;
-
 	if(reset) {ear_out, mic_out} <= 2'b00;
-	else if(ula_we & ~old_we) begin
+	else if(~ula_nWR) begin
 		border_color <= cpu_dout[2:0];
 		ear_out <= cpu_dout[4]; 
 		mic_out <= cpu_dout[3];
@@ -837,7 +834,9 @@ wire       tmx_avail = ~status[13] & ~trdos_en;
 wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
-ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
+wire       ula_nWR;
+
+ULA ULA(.*, .nPortRD(), .nPortWR(ula_nWR), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg ce_sys1;
