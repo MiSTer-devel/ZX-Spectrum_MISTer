@@ -139,8 +139,8 @@ always @(posedge clk_sys) begin
 						keys[0][0] <= 1; // CAPS SHIFT off
 					end
 
-				8'h59, 8'h12: keys[0][0] <= 0; // CAPS SHIFT
-				8'h14: keys[7][1] <= 0;  // SYMBOL SHIFT
+				8'h59, 8'h12: keys[0][0] <= 0; // CAPS SHIFT on
+				8'h14: keys[7][1] <= 0;  // SYMBOL SHIFT on
 
 				default: begin
 						keys[0][0] <= ~shift; // CAPS SHIFT
