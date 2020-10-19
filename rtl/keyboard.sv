@@ -54,6 +54,7 @@ module keyboard
 reg  [4:0] keys[7:0];
 reg        release_btn = 0;
 reg  [7:0] code;
+reg        extended = 0;
 
 // Output addressed row to ULA
 assign key_data = (!addr[8]  ? keys[0] : 5'b11111)
@@ -66,7 +67,11 @@ assign key_data = (!addr[8]  ? keys[0] : 5'b11111)
                  &(!addr[15] ? keys[7] : 5'b11111);
 
 reg  input_strobe = 0;
-wire shift = mod[0];
+
+reg  left_shift = 0;
+wire shift = mod[0] | left_shift;
+reg  right_ctrl = 0;
+wire ctrl = mod[2] | right_ctrl;
 
 always @(posedge clk_sys) begin
 	reg old_reset = 0;
@@ -81,13 +86,22 @@ always @(posedge clk_sys) begin
 		keys[5] <= 5'b11111;
 		keys[6] <= 5'b11111;
 		keys[7] <= 5'b11111;
+		left_shift <= 0;
+		right_ctrl <= 0;
 	end
 
 	if(input_strobe) begin
 		case(code)
 			8'h59: mod[0]<= ~release_btn; // right shift
+			8'h12: left_shift <= ~release_btn;
 			8'h11: mod[1]<= ~release_btn; // alt
-			8'h14: mod[2]<= ~release_btn; // ctrl
+			8'h14: begin
+					if (~extended) begin
+						mod[2]<= ~release_btn; // left_ctrl
+					end else begin
+						right_ctrl <= ~release_btn;
+					end
+				end
 			8'h05: Fn[1] <= ~release_btn; // F1
 			8'h06: Fn[2] <= ~release_btn; // F2
 			8'h04: Fn[3] <= ~release_btn; // F3
@@ -100,10 +114,59 @@ always @(posedge clk_sys) begin
 			8'h09: Fn[10]<= ~release_btn; // F10
 			8'h78: Fn[11]<= ~release_btn; // F11
 		endcase
+		
+		// update CAPS SHIFT and SYMBOL SHIFT
+		if (~release_btn) begin // key down
+			case(code)
+				// special keys sent to the ULA as key combinations
+
+				// keys that add CAPS SHIFT, and remove SYMBOL SHIFT
+				8'h6B, // Left (CAPS 5)
+				8'h72, // Down (CAPS 6)
+				8'h75, // Up (CAPS 7)
+				8'h74, // Right (CAPS 8)
+				8'h66, // Backspace (CAPS 0)
+				8'h58, // Caps lock (CAPS 2)
+				8'h76 : begin // Escape (CAPS SPACE)
+						keys[0][0] <= 0; // CAPS SHIFT on
+						keys[7][1] <= 1; // SYMBOL SHIFT off
+					end
+
+				// keys that add SYMBOL SHIFT and remove CAPS SHIFT
+				// , < . > / ? ; : ' " [ { ] } - _ = + ` ~ *
+				8'h49, 8'h41, 8'h4A, 8'h4C, 8'h52, 8'h54, 8'h5b, 8'h4E, 8'h55, 8'h0E, 8'h7C, 8'h5D : begin 
+						keys[7][1] <= 0; // SYMBOL SHIFT on
+						keys[0][0] <= 1; // CAPS SHIFT off
+					end
+
+				default: begin
+						keys[0][0] <= ~shift; // CAPS SHIFT
+						keys[7][1] <= ~ctrl;  // SYMBOL SHIFT
+					end
+			endcase
+		end else begin // (release_btn) - key up
+			case(code)
+				// only sets CAPS SHIFT and SYMBOL SHIFT on shift or ctrl release
+				// fixes fast alternating between left cursor and right cursor giving 5s and 8s
+				8'h12: begin // left shift
+						keys[0][0] <= ~mod[0]; // CAPS SHIFT
+					end
+				8'h59: begin // right shift
+						keys[0][0] <= ~left_shift; // CAPS SHIFT
+					end
+				8'h14: begin
+						if (~extended) begin // left ctrl
+							keys[7][1] <= ~right_ctrl; // SYMBOL SHIFT
+						end else begin // right ctrl
+							keys[7][1] <= ~mod[2]; // SYMBOL SHIFT
+						end
+					end
+				default: ;
+			endcase
+		end
 
 		case(code)
-			8'h12 : keys[0][0] <= release_btn; // Left shift (CAPS SHIFT)
-			8'h59 : keys[0][0] <= release_btn; // Right shift (CAPS SHIFT)
+			// keys[0][0] CAPS SHIFT is set above
 			8'h1a : keys[0][1] <= release_btn; // Z
 			8'h22 : keys[0][2] <= release_btn; // X
 			8'h21 : keys[0][3] <= release_btn; // C
@@ -146,7 +209,7 @@ always @(posedge clk_sys) begin
 			8'h33 : keys[6][4] <= release_btn; // H
 
 			8'h29 : keys[7][0] <= release_btn; // SPACE
-			8'h14 : keys[7][1] <= release_btn; // CTRL (Symbol Shift)
+			// keys[7][1] SYMBOL SHIFT is set above
 			8'h3a : keys[7][2] <= release_btn; // M
 			8'h31 : keys[7][3] <= release_btn; // N
 			8'h32 : keys[7][4] <= release_btn; // B
@@ -155,87 +218,49 @@ always @(posedge clk_sys) begin
 			// the scancodes for the numeric keypad cursor keys are
 			// are the same but without the extension, so we'll accept
 			// the codes whether they are extended or not
-			8'h6B : begin // Left (CAPS 5)
-					keys[0][0] <= release_btn;
-					keys[3][4] <= release_btn;
-				end
-			8'h72 : begin // Down (CAPS 6)
-					keys[0][0] <= release_btn;
-					keys[4][4] <= release_btn;
-				end
-			8'h75 : begin // Up (CAPS 7)
-					keys[0][0] <= release_btn;
-					keys[4][3] <= release_btn;
-				end
-			8'h74 : begin // Right (CAPS 8)
-					keys[0][0] <= release_btn;
-					keys[4][2] <= release_btn;
-				end
+			8'h6B : keys[3][4] <= release_btn; // Left (CAPS 5)
+			8'h72 : keys[4][4] <= release_btn; // Down (CAPS 6)
+			8'h75 : keys[4][3] <= release_btn; // Up (CAPS 7)
+			8'h74 : keys[4][2] <= release_btn; // Right (CAPS 8)
 
 			// Other special keys sent to the ULA as key combinations
-			8'h66 : begin // Backspace (CAPS 0)
-					keys[0][0] <= release_btn;
-					keys[4][0] <= release_btn;
+			8'h66 : keys[4][0] <= release_btn; // Backspace (CAPS 0)
+			8'h58 : keys[3][1] <= release_btn; // Caps lock (CAPS 2)
+			8'h76 : keys[7][0] <= release_btn; // Escape (CAPS SPACE)
+
+			8'h49 : begin // , <
+					keys[2][4] <= release_btn | ~shift; // <
+					keys[7][3] <= release_btn |  shift; // ,
 				end
-			8'h58 : begin // Caps lock (CAPS 2)
-					keys[0][0] <= release_btn;
-					keys[3][1] <= release_btn;
-				end
-			8'h76 : begin // Escape (CAPS SPACE)
-					keys[0][0] <= release_btn;
-					keys[7][0] <= release_btn;
-				end
-			8'h49 : begin // . <
-					keys[7][1] <= release_btn;
-					keys[2][4] <= release_btn | ~shift;
-					keys[7][2] <= release_btn |  shift;
-				end
-			8'h41 : begin // , >
-					keys[7][1] <= release_btn;
-					keys[2][3] <= release_btn | ~shift;
-					keys[7][3] <= release_btn |  shift;
+			8'h41 : begin // . >
+					keys[2][3] <= release_btn | ~shift; // >
+					keys[7][2] <= release_btn |  shift; // .
 				end
 			8'h4A : begin // / ?
-					keys[7][1] <= release_btn;
-					keys[0][3] <= release_btn | ~shift;
-					keys[0][4] <= release_btn |  shift;
+					keys[0][3] <= release_btn | ~shift; // ?
+					keys[0][4] <= release_btn |  shift; // /
 				end
 			8'h4C : begin // ; :
-					keys[7][1] <= release_btn;
-					keys[0][1] <= release_btn | ~shift;
-					keys[5][1] <= release_btn |  shift;
+					keys[0][1] <= release_btn | ~shift; // :
+					keys[5][1] <= release_btn |  shift; // ;
 				end
-			8'h52 : begin // " '
-					keys[7][1] <= release_btn;
-					keys[4][3] <= release_btn | ~shift;
-					keys[5][0] <= release_btn |  shift;
+			8'h52 : begin // ' "	// note:  ' and " intentionally swapped
+					keys[5][0] <= release_btn |  shift; // "
+					keys[4][3] <= release_btn | ~shift; // '
 				end
-			8'h54 : begin // (
-					keys[7][1] <= release_btn;
-					keys[4][2] <= release_btn;
-				end
-			8'h5B : begin // )
-					keys[7][1] <= release_btn;
-					keys[4][1] <= release_btn;
-				end
+			8'h54 : keys[4][3] <= release_btn; // [ { give (
+			8'h5B : keys[4][3] <= release_btn; // ] } give )
 			8'h4E : begin // - _
-					keys[7][1] <= release_btn;
-					keys[4][0] <= release_btn | ~shift;
-					keys[6][3] <= release_btn |  shift;
+					keys[4][0] <= release_btn | ~shift; // _
+					keys[6][3] <= release_btn |  shift; // -
 				end
 			8'h55 : begin // = +
-					keys[7][1] <= release_btn;
-					keys[6][2] <= release_btn | ~shift;
-					keys[6][1] <= release_btn |  shift;
+					keys[6][2] <= release_btn | ~shift; // +
+					keys[6][1] <= release_btn |  shift; // =
 				end
-			8'h0E : begin // '
-					keys[7][1] <= release_btn;
-					keys[4][3] <= release_btn;
-				end
-			8'h5D : begin // *
-					keys[7][1] <= release_btn;
-					keys[7][4] <= release_btn;
-				end
+			8'h0E : keys[4][3] <= release_btn; // ` ~ give `
+			8'h7C : keys[7][4] <= release_btn; // numeric *
+			8'h5D : keys[7][4] <= release_btn; // \ | give *
 			default: ;
 		endcase
 	end
@@ -282,6 +307,7 @@ always @(posedge clk_sys) begin
 			if(old_state != ps2_key[10]) begin
 				release_btn <= ~ps2_key[9];
 				code <= ps2_key[7:0];
+				extended <= ps2_key[8];
 				input_strobe <= 1;
 				if((ps2_key[8:0] == 9) && ~ps2_key[9]) auto_pos <= 1; // F10
 			end
