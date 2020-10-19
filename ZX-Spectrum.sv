@@ -178,7 +178,6 @@ localparam CONF_STR = {
 
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
-	"OQ,Recreated Keyboard,Disabled,Enabled;",
 	"-;",
 	"O6,Fast Tape Load,On,Off;",
 	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
@@ -908,7 +907,6 @@ end
 wire [11:1] Fn;
 wire  [2:0] mod;
 wire  [4:0] key_data;
-wire        recreated_keyboard = status[26];
 keyboard kbd( .* );
 
 reg         mouse_sel;
