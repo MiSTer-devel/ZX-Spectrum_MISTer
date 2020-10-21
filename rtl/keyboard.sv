@@ -139,9 +139,15 @@ always @(posedge clk_sys) begin
 						keys[0][0] <= 1; // CAPS SHIFT off
 					end
 
-				8'h59, 8'h12: keys[0][0] <= 0; // CAPS SHIFT on
-				8'h14: keys[7][1] <= 0;  // SYMBOL SHIFT on
-
+				8'h59, 8'h12: begin
+						keys[0][0] <= 0; // CAPS SHIFT on
+						keys[7][1] <= ~ctrl; // SYMBOL SHIFT
+					end
+				8'h14: begin
+						keys[7][1] <= 0;  // SYMBOL SHIFT on
+						keys[0][0] <= ~shift; // CAPS SHIFT
+					end
+						
 				default: begin
 						keys[0][0] <= ~shift; // CAPS SHIFT
 						keys[7][1] <= ~ctrl;  // SYMBOL SHIFT
@@ -239,7 +245,7 @@ always @(posedge clk_sys) begin
 					keys[2][3] <= release_btn | ~shift; // >
 					keys[7][2] <= release_btn |  shift; // .
 				end
-			8'h4A : begin // / ?
+			8'h4A : begin // / ? and numeric /
 					keys[0][3] <= release_btn | ~shift; // ?
 					keys[0][4] <= release_btn |  shift; // /
 				end
@@ -251,8 +257,8 @@ always @(posedge clk_sys) begin
 					keys[5][0] <= release_btn |  shift; // "
 					keys[4][3] <= release_btn | ~shift; // '
 				end
-			8'h54 : keys[4][3] <= release_btn; // [ { give (
-			8'h5B : keys[4][3] <= release_btn; // ] } give )
+			8'h54 : keys[4][2] <= release_btn; // [ { give (
+			8'h5B : keys[4][1] <= release_btn; // ] } give )
 			8'h4E : begin // - _
 					keys[4][0] <= release_btn | ~shift; // _
 					keys[6][3] <= release_btn |  shift; // -
