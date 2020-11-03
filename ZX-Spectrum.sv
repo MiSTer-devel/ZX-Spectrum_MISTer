@@ -178,6 +178,7 @@ localparam CONF_STR = {
 
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
+	"OQR,Keyboard,US Layout,UK Layout,Rec ZX Spectrum;",
 	"-;",
 	"O6,Fast Tape Load,On,Off;",
 	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
@@ -907,7 +908,7 @@ end
 wire [11:1] Fn;
 wire  [2:0] mod;
 wire  [4:0] key_data;
-keyboard kbd( .* );
+keyboard kbd( .*, .layout(status[27:26]) );
 
 reg         mouse_sel;
 wire  [7:0] mouse_data;
