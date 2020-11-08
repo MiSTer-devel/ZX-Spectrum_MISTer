@@ -38,8 +38,8 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	output [11:0] VIDEO_ARX,
+	output [11:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -49,6 +49,7 @@ module emu
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
 	output  [1:0] VGA_SL,
+	output        VGA_SCALER, // Force VGA scaler
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -135,9 +136,10 @@ assign LED_USER  = ioctl_download | tape_led | tape_adc_act;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
+assign VGA_SCALER= 0;
 
-assign VIDEO_ARX = status[5:4] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[5:4] ? 8'd9  : 8'd3;
+assign VIDEO_ARX = (!status[5:4]) ? (status[1] ? 8'd16 : 8'd4) : (status[5:4] - 1'd1);
+assign VIDEO_ARY = (!status[5:4]) ? (status[1] ? 8'd9  : 8'd3) : 8'd0;
 
 localparam ARCH_ZX48  = 5'b011_00; // ZX 48
 localparam ARCH_ZX128 = 5'b000_01; // ZX 128/+2
@@ -161,7 +163,8 @@ localparam CONF_STR = {
 
 	"P1,Audio & Video;",
 	"P1-;",
-	"P1O45,Aspect Ratio,Original,Wide,Zoom;",
+	"P1O1,Video,Original,Wide;",
+	"P1O45,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"P1-;",
 	"P1OKL,General Sound,512KB,1MB,2MB,Disabled;",
@@ -642,7 +645,6 @@ reg [2:0] border_color;
 reg       ear_out;
 reg       mic_out;
 
-wire ula_we = ~addr[0] & ~nIORQ & ~nWR & nM1;
 always @(posedge clk_sys) begin
 	if(reset) {ear_out, mic_out} <= 2'b00;
 	else if(~ula_nWR) begin
@@ -836,7 +838,7 @@ wire       I,R,G,B;
 wire [7:0] ulap_color;
 wire       ula_nWR;
 
-ULA ULA(.*, .nPortRD(), .nPortWR(ula_nWR), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[5]));
+ULA ULA(.*, .nPortRD(), .nPortWR(ula_nWR), .din(cpu_dout), .page_ram(page_ram[2:0]), .wide(status[1]));
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg ce_sys1;
