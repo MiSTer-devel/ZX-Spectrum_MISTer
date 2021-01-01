@@ -1,25 +1,25 @@
-# ZX Spectrum 128K for [MiSTer Board](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
+# [ZX Spectrum](https://en.wikipedia.org/wiki/ZX_Spectrum) for MiSTer Platform
 
 Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/mist-board/tree/master/cores/spectrum) core were used in this project.
 
 ### Features:
-- Fully functional ZX Spectrum 48K, 128K, +3 and Pentagon 128 with correct CPU and Video timings.
+- Fully functional [ZX Spectrum 48K, 128K, +3](https://en.wikipedia.org/wiki/ZX_Spectrum) and [Pentagon 128](https://en.wikipedia.org/wiki/Pentagon_(computer)) with correct CPU and Video timings.
 - Pentagon 1024K and Profi 1024K memory interfaces.
 - Turbo 7MHz, 14MHz, 28MHz, 56MHz.
-- ULA+ v1.1 programmable palettes with extended Timex control.
+- [ULA+ v1.1](https://sinclair.wiki.zxnet.co.uk/wiki/ULAplus) programmable palettes with extended Timex control.
 - Timex HiColor, HiRes modes.
 - TAP tape format with turbo (direct byte injection) and normal loading.
 - TZX and CSW tape formats with fast(16x) and normal loading.
 - Z80 snapshot loading.
-- TR-DOS (Beta Disk Interface) - TRD(read/write) and SCL(read-only) images.
-- G+DOS (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
+- [TR-DOS](https://sinclair.wiki.zxnet.co.uk/wiki/TR-DOS_filesystem) (Beta Disk Interface) - TRD(read/write) and SCL(read-only) images.
+- [G+DOS](https://en.wikipedia.org/wiki/%2BD) (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
 - +3 Disk drive usable with +3DOS.
-- Multiface 128 and Multiface 3 (in +3 mode) add-on.
+- [Multiface 128 and Multiface 3](https://en.wikipedia.org/wiki/Multiface) (in +3 mode) add-on.
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
 - Joysticks: Kempston, Sinclair I/II, Cursor
-- General Sound with 512KB-2MB of RAM
-- Turbosound-FM (dual YM2203 incl. dual YM2149)
+- [General Sound](https://8bit.yarek.pl/interface/zx.generalsound/index.html) with 512KB-2MB of RAM
+- [Turbosound-FM](http://speccy.info/TurboSound_FM) (dual YM2203 incl. dual YM2149)
 - SAA1099
 
 ### Installation:
