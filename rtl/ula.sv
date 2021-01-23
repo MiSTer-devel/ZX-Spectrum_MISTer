@@ -270,7 +270,7 @@ end
 
 /////////////////  ULA+, Timex  ///////////////////
 
-assign     ulap_dout = ulap_group ? {6'd0, ulap_mono, ulap_ena} : palette[pal_addr];
+assign     ulap_dout = ulap_group ? {6'd0, ulap_mono, ulap_ena} : palette_q;
 assign     ulap_sel  = ulap_acc & addr[14] & ulap_avail;
 
 wire       ulap_acc = ({addr[15], 1'b0, addr[13:0]} == 'hBF3B);
@@ -278,6 +278,7 @@ wire       io_wr = ~nIORQ & ~nWR;
 reg  [5:0] pal_addr;
 reg        ulap_group;
 reg  [7:0] palette[64];
+reg  [7:0] palette_q;
 
 reg  [5:0] tmx_cfg;
 reg        tmx_ena;
@@ -287,6 +288,8 @@ wire       tmx_hi = &{tmx_ena, tmx_cfg[2:1]};
 always @(posedge clk_sys) begin
 	reg old_wr;
 	old_wr <= io_wr;
+
+	palette_q <= palette[pal_addr];
 
 	if(reset) begin
 		{ulap_ena, tmx_ena, tmx_using_ff, tmx_cfg} <= 0;
