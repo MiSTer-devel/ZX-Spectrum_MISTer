@@ -158,7 +158,7 @@ localparam CONF_STR = {
 	"-;",
 	"S0,TRDIMGDSKMGT,Load Disk;",
 	"F2,TAPCSWTZX,Load Tape;",
-	"F4,Z80,Load Snapshot;",
+	"F4,Z80SNA,Load Snapshot;",
 	"-;",
 
 	"P1,Audio & Video;",
@@ -1239,11 +1239,12 @@ snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128) snap_loader
 (
 	.clk_sys(clk_sys),
 
-	.ioctl_download(ioctl_download && ioctl_index == 4),
+	.ioctl_download(ioctl_download && ioctl_index[4:0] == 4),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_data(ioctl_dout),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_wait(ioctl_wait),
+	.snap_sna(|ioctl_index[7:6]),
 
 	.ram_ready(ram_ready),
 

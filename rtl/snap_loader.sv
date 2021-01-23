@@ -20,13 +20,15 @@
 module snap_loader #(parameter ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128)
 (
 	input          clk_sys,
-	
+
 	input          ioctl_download,
 	input   [24:0] ioctl_addr,
 	input    [7:0] ioctl_data,
 	input          ioctl_wr,
 	output         ioctl_wait,
-	
+
+	input          snap_sna,
+
 	input          ram_ready,
 
 	output [211:0] REG,
@@ -36,14 +38,14 @@ module snap_loader #(parameter ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128)
 	output   [7:0] dout,
 	output         wr,
 
-   output         reset,
-   output         hwset,
-   output   [4:0] hw,
-   input    [4:0] hw_ack,
+	output         reset,
+	output         hwset,
+	output   [4:0] hw,
+	input    [4:0] hw_ack,
 
-   output   [2:0] border,
-   output   [7:0] reg_1ffd,
-   output   [7:0] reg_7ffd
+	output   [2:0] border,
+	output   [7:0] reg_1ffd,
+	output   [7:0] reg_7ffd
 );
 
 /*
@@ -156,6 +158,18 @@ v2,v3
 	  
 */
 
+/* SNA 48k
+   0        1      byte   I
+   1        8      word   HL',DE',BC',AF'
+   9        10     word   HL,DE,BC,IY,IX
+   19       1      byte   Interrupt (bit 2 contains IFF2, 1=EI/0=DI)
+   20       1      byte   R
+   21       4      words  AF,SP
+   25       1      byte   IntMode (0=IM0/1=IM1/2=IM2)
+   26       1      byte   BorderColor (0..7, not used by Spectrum 1.7)
+   27       49152  bytes  RAM dump 16384..65535
+*/
+
 assign REG = snap_REG;
 assign REGSet = snap_REGSet;
 assign dout = snap_data;
@@ -187,7 +201,7 @@ reg   [7:0] snap_7ffd;
 
 always_comb begin
 	addr = addr_pre;
-	if(hdrv1) begin
+	if(hdrv1 || snap_sna) begin
 		case(addr_pre[17:14])
 				0: addr[16:14] = 5;
 				1: addr[16:14] = 2;
@@ -221,7 +235,7 @@ always_ff @(posedge clk_sys) begin
 
 	//prepare to download snapshot with default v1 header
 	if(~old_download && ioctl_download) begin
-		snap_hdrlen <= 30;
+		snap_hdrlen <= snap_sna ? 8'd27 : 8'd30;
 		snap_reset <= 1;
 		snap_hw <= 0;
 	end
@@ -250,7 +264,7 @@ always_ff @(posedge clk_sys) begin
 
 	if(ioctl_download & ioctl_wr) begin
 		if (ioctl_addr<snap_hdrlen) begin
-			case(ioctl_addr[6:0])
+			if (!snap_sna) case(ioctl_addr[6:0]) // Z80
 				 0: snap_REG[7:0]     <= ioctl_data; //a
 				 1: snap_REG[15:8]    <= ioctl_data; //f
 				 2: snap_REG[87:80]   <= ioctl_data; //c
@@ -317,6 +331,47 @@ always_ff @(posedge clk_sys) begin
 				35: snap_7ffd <= ioctl_data;
 				//37: snap_mhw  <= ioctl_data[7];
 				86: snap_1ffd <= ioctl_data;
+			endcase
+			else case(ioctl_addr[6:0]) // SNA
+				 0: begin
+						snap_REG[39:32]   <= ioctl_data; //i
+						snap_REG[71:64]   <= 8'h72; //pcl - RETN in this address
+						snap_REG[79:72]   <= 8'h00; //pch
+						snap_1ffd <= 0;
+						snap_hw <= ARCH_ZX48;
+						finish <= 0;
+						addr <= 0;
+						sz <= 'hC000;
+						compr <= 0;
+						comp_state <= 3;
+						wren <= 1;
+					end
+				 1: snap_REG[183:176] <= ioctl_data; //l'
+				 2: snap_REG[191:184] <= ioctl_data; //h'
+				 3: snap_REG[167:160] <= ioctl_data; //e'
+				 4: snap_REG[175:168] <= ioctl_data; //d'
+				 5: snap_REG[151:144] <= ioctl_data; //c'
+				 6: snap_REG[159:152] <= ioctl_data; //b'
+				 7: snap_REG[23:16]   <= ioctl_data; //a'
+				 8: snap_REG[31:24]   <= ioctl_data; //f'
+				 9: snap_REG[119:112] <= ioctl_data; //l
+				10: snap_REG[127:120] <= ioctl_data; //h
+				11: snap_REG[103:96]  <= ioctl_data; //e
+				12: snap_REG[111:104] <= ioctl_data; //d
+				13: snap_REG[87:80]   <= ioctl_data; //c
+				14: snap_REG[95:88]   <= ioctl_data; //b
+				15: snap_REG[199:192] <= ioctl_data; //yl
+				16: snap_REG[207:200] <= ioctl_data; //yh
+				17: snap_REG[135:128] <= ioctl_data; //xl
+				18: snap_REG[143:136] <= ioctl_data; //xh
+				19: snap_REG[211:210] <= {ioctl_data[2], 1'b0}; //iff2,iff1
+				20: snap_REG[47:40]   <= ioctl_data; //r
+				21: snap_REG[7:0]     <= ioctl_data; //a
+				22: snap_REG[15:8]    <= ioctl_data; //f
+				23: snap_REG[55:48]   <= ioctl_data; //spl
+				24: snap_REG[63:56]   <= ioctl_data; //sph
+				25: snap_REG[209:208] <= ioctl_data[1:0]; //im
+				26: snap_border       <= ioctl_data[2:0];
 			endcase
 		end
 
@@ -388,7 +443,7 @@ always_ff @(posedge clk_sys) begin
 			if(comp_state>=3) begin
 				sz <= sz - 1'd1;
 				if(sz == 1) begin
-					if(snap_hdrlen == 30) finish <= 1;
+					if(snap_hdrlen == 30 || snap_sna) finish <= 1;
 					else comp_state <= 0;
 				end
 			end
@@ -409,7 +464,7 @@ always_ff @(posedge clk_sys) begin
 	end
 	
 	//v1 - 49152 bytes max
-	if(snap_wr && (snap_hdrlen == 30) && (addr_pre == 'hBFFF)) wren <= 0;
+	if(snap_wr && ((snap_hdrlen == 30) || snap_sna) && (addr_pre == 'hBFFF)) wren <= 0;
 end
 
 endmodule
