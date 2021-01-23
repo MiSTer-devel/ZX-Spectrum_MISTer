@@ -443,7 +443,7 @@ T80pa cpu
 );
 
 always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[7:0]==8'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
+	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, addr[5:0]==8'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
 		'b01XXXXXXXXX: cpu_din = tape_dout;
 		'b00XXXXXXXXX: cpu_din = ram_dout;
 		'b1X01XXXXXXX: cpu_din = fdd_dout;
@@ -454,7 +454,7 @@ always_comb begin
 		'b1X0000001XX: cpu_din = (addr[14] ? sound_data : 8'hFF);
 		'b1X00000001X: cpu_din = ulap_dout;
 		'b1X000000001: cpu_din = port_ff;
-		'b1X000000000: cpu_din = {1'b1, ~tape_in, 1'b1, key_data[4:0] & joy_kbd};
+		'b1X000000000: cpu_din = {1'b1, ula_tape_in, 1'b1, key_data[4:0] & joy_kbd};
 		'b1X1XXXXXXXX: cpu_din = 8'hFF;
 	endcase
 end
@@ -1177,7 +1177,8 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign tape_in = tape_loaded_reg ? tape_vin : tape_adc_act & tape_adc;
+assign tape_in = ~(tape_loaded_reg ? tape_vin : tape_adc_act & tape_adc);
+assign ula_tape_in = tape_in | ear_out;
 
 wire tape_adc, tape_adc_act;
 ltc2308_tape ltc2308_tape
