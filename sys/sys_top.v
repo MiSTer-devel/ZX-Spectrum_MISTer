@@ -1000,6 +1000,18 @@ hdmi_config hdmi_config
 	.ypbpr(ypbpr_en & direct_video)
 );
 
+assign HDMI_I2C_SCL = hdmi_scl_en ? 1'b0 : 1'bZ;
+assign HDMI_I2C_SDA = hdmi_sda_en ? 1'b0 : 1'bZ;
+
+wire hdmi_scl_en, hdmi_sda_en;
+cyclonev_hps_interface_peripheral_i2c hdmi_i2c
+(
+	.out_clk(hdmi_scl_en),
+	.scl(HDMI_I2C_SCL),
+	.out_data(hdmi_sda_en),
+	.sda(HDMI_I2C_SDA)
+);
+
 `ifndef DEBUG_NOHDMI
 wire [23:0] hdmi_data_sl;
 wire        hdmi_de_sl, hdmi_vs_sl, hdmi_hs_sl;
@@ -1210,32 +1222,45 @@ wire vga_cs_osd;
 csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 
 `ifndef DUAL_SDRAM
-	wire vs1 = (vga_fb | vga_scaler) ? hdmi_vs_osd : vga_vs_osd;
-	wire hs1 = (vga_fb | vga_scaler) ? hdmi_hs_osd : vga_hs_osd;
-	wire cs1 = (vga_fb | vga_scaler) ? hdmi_cs_osd : vga_cs_osd;
+	wire [23:0] vgas_o;
+	wire vgas_hs, vgas_vs, vgas_cs;
+	vga_out vga_scaler_out
+	(
+		.clk(clk_hdmi),
+		.ypbpr_en(ypbpr_en),
+		.hsync(hdmi_hs_osd),
+		.vsync(hdmi_vs_osd),
+		.csync(hdmi_cs_osd),
+		.dout(vgas_o),
+		.din({24{hdmi_de_osd}} & hdmi_data_osd),
+		.hsync_o(vgas_hs),
+		.vsync_o(vgas_vs),
+		.csync_o(vgas_cs)
+	);
 
 	wire [23:0] vga_o;
 	wire vga_hs, vga_vs, vga_cs;
 	vga_out vga_out
 	(
 		.clk(clk_vid),
-		.ypbpr_full(0),
 		.ypbpr_en(ypbpr_en),
-		.hsync(hs1),
-		.vsync(vs1),
-		.csync(cs1),
+		.hsync(vga_hs_osd),
+		.vsync(vga_vs_osd),
+		.csync(vga_cs_osd),
 		.dout(vga_o),
-		.din((vga_fb | vga_scaler) ? {24{hdmi_de_osd}} & hdmi_data_osd : vga_data_osd),
+		.din(vga_data_osd),
 		.hsync_o(vga_hs),
 		.vsync_o(vga_vs),
 		.csync_o(vga_cs)
 	);
 
-	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ      : csync_en ? 1'b1    : ~vga_vs;
-	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ      : csync_en ? ~vga_cs : ~vga_hs;
-	assign VGA_R  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[23:18];
-	assign VGA_G  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[15:10];
-	assign VGA_B  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[7:2];
+	wire cs1 = (vga_fb | vga_scaler) ? vgas_cs : vga_cs;
+
+	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ      : ((vga_fb | vga_scaler) ? ~vgas_vs : ~vga_vs) | csync_en;
+	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ      :  (vga_fb | vga_scaler) ? (csync_en ? ~vgas_cs : ~vgas_hs) : (csync_en ? ~vga_cs : ~vga_hs);
+	assign VGA_R  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :  (vga_fb | vga_scaler) ? vgas_o[23:18] : vga_o[23:18];
+	assign VGA_G  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :  (vga_fb | vga_scaler) ? vgas_o[15:10] : vga_o[15:10];
+	assign VGA_B  = (VGA_EN | SW[3]) ? 6'bZZZZZZ :  (vga_fb | vga_scaler) ? vgas_o[7:2]   : vga_o[7:2]  ;
 `endif
 
 reg video_sync = 0;
