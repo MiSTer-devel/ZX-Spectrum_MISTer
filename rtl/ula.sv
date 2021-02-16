@@ -163,8 +163,7 @@ always @(posedge clk_sys) begin
 		end
 
 		if(wide) begin
-			HBlank <= !(hc_next < 312 || hc_next >= ((mZX && m128) ? 455-33 : 447-33));
-			VBlank <= !(vc_next < 193 || vc_next >= (!mZX ? 319-4 : m128 ? 310-4 : 311-4));
+			HBlank <= !(hc_next < 290 || hc_next >= ((mZX && m128) ? 455-11 : 447-11));
 		end
 
 		if( mZX && (vc_next == 248) && (hc_next == (m128 ? 8 : 4))) INT <= 1;
