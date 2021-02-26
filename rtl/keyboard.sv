@@ -239,11 +239,11 @@ always @(posedge clk_sys) begin
 
 			8'h49 : begin // , <
 					keys[2][4] <= release_btn | ~shift; // <
-					keys[7][3] <= release_btn |  shift; // ,
+					keys[7][2] <= release_btn |  shift; // ,
 				end
 			8'h41 : begin // . >
 					keys[2][3] <= release_btn | ~shift; // >
-					keys[7][2] <= release_btn |  shift; // .
+					keys[7][3] <= release_btn |  shift; // .
 				end
 			8'h4A : begin // / ? and numeric /
 					keys[0][3] <= release_btn | ~shift; // ?
