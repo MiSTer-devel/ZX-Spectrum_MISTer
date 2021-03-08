@@ -202,7 +202,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXX XXXXXXXXXXXXXXXXXXXX
+// X XXXXX XXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -218,7 +218,8 @@ localparam CONF_STR = {
 	"P1O45,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"P1-;",
-	"d1P1O1,Vertical Crop,No,Yes;",
+	"H2d1P1OS,Vertical Crop,No,Yes;",
+	"h2d1P1OST,Vertical Crop,No,270,216;",
 	"P1OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"P1-;",
 	"P1OKL,General Sound,512KB,1MB,2MB,Disabled;",
@@ -409,7 +410,7 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5)) hps_io
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
-	.status_menumask({|vcrop,~need_apply}),
+	.status_menumask({en1080p,|vcrop,~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset),
 	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
@@ -938,13 +939,16 @@ always @(posedge CLK_VIDEO) begin
 		if(HDMI_HEIGHT == 720)  vcrop <= 240;
 		if(HDMI_HEIGHT == 768)  vcrop <= 256;
 		if(HDMI_HEIGHT == 800)  begin vcrop <= 200; wide <= vcrop_en; end
-		if(HDMI_HEIGHT == 1080) vcrop <= 270;
+		if(HDMI_HEIGHT == 1080) vcrop <= status[29] ? 10'd216 : 10'd270;
 		if(HDMI_HEIGHT == 1200) vcrop <= 240;
 	end
 end
 
+reg en1080p;
+always @(posedge CLK_VIDEO) en1080p <= (HDMI_WIDTH == 1920) && (HDMI_HEIGHT == 1080);
+
 wire [1:0] ar = status[5:4];
-wire vcrop_en = status[1];
+wire vcrop_en = en1080p ? |status[29:28] : status[28];
 wire vga_de;
 video_freak video_freak
 (
