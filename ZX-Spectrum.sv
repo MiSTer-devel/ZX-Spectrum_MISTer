@@ -201,7 +201,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXX XXXXXXXXXXXXXXXXXXXXXX
+// X XXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -226,6 +226,7 @@ localparam CONF_STR = {
 
 	"P2,Hardware;",
 	"P2-;",
+	"P2O7,Port #FE,Issue 2,Issue 3;",
 	"P2OD,Port #FF,Timex,SAA1099;",
 	"P2OE,ULA+,Enabled,Disabled;",
 	"P2OP,Snow Bug,Disabled,Enabled;",
@@ -1258,7 +1259,7 @@ always @(posedge clk_sys) begin
 end
 
 wire tape_in = tape_loaded_reg ? ~tape_vin : tape_adc_act & ~tape_adc;
-wire ula_tape_in = tape_in | ear_out;
+wire ula_tape_in = tape_in | ear_out | (~status[7] & mic_out);
 
 wire tape_adc, tape_adc_act;
 ltc2308_tape ltc2308_tape
