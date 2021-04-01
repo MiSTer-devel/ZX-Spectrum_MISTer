@@ -1258,7 +1258,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-wire tape_in = ~(tape_loaded_reg ? tape_vin : tape_adc_act & tape_adc);
+wire tape_in = tape_loaded_reg ? ~tape_vin : tape_adc_act & ~tape_adc;
 wire ula_tape_in = tape_in | ear_out;
 
 wire tape_adc, tape_adc_act;
