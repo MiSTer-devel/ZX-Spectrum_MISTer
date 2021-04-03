@@ -14,6 +14,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - [TR-DOS](https://sinclair.wiki.zxnet.co.uk/wiki/TR-DOS_filesystem) (Beta Disk Interface) - TRD(read/write) and SCL(read-only) images.
 - [G+DOS](https://en.wikipedia.org/wiki/%2BD) (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
 - +3 Disk drive usable with +3DOS.
+- DivMMC with ESXDOS.
 - [Multiface 128 and Multiface 3](https://en.wikipedia.org/wiki/Multiface) (in +3 mode) add-on.
 - Memory snapshot save/load in +D and Multiface.
 - Kempston Mouse.
@@ -95,13 +96,19 @@ You will be able to use bare Multiface ROM by simple subsequent presses of **RSh
 **Note:** Multiface 128 expose its port, thus if game has protection against Multiface, it won't work, unless you press (o)ff before you exit from the Multiface menu. Thus using +D snapshot is prefered.
 When using the Spectrum +2A/3 mode, the Multiface 3 is supported. There's no Genie for the +3, but there are useful toolkit routines in the stock ROM.
 
+### DivMMC
+Supported both VHD images and secondary SD card. Default **auto** mode makes DivMMC hidden til VHD image gets selected.
+You have to get ESXDOS package, rename **ESXMMC.BIN** to **boot1.rom** and place to **games/Spectrum/**
+Make sure boot1.rom and files inside VHD (or SD card) are from the same ESXDOS version.
+
+
 ### Special Keys:
 - Ctrl+F11 - warm reset
 - Alt+F11 - cold reset will disk unload
 - Ctrl+Alt+F11 - reset to ROM0 menu
 - F10 - switch to Basic 48 (without 48K lock) and issue **LOAD""**
 - RShift+F10 - same as F10 with 48K lock
-- F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted)
+- F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted) or DivMMC file browser.
 - RShift+F11 - enter Multiface 128 menu
 - F12 - OSD menu
 
