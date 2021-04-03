@@ -174,12 +174,11 @@ module emu
 assign USER_OUT = '1;
 assign VGA_F1 = 0;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
-assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[3:2];
 
-assign LED_USER  = ioctl_download | tape_led | tape_adc_act;
+assign LED_USER  = ioctl_download | tape_led | tape_adc_act | (sd_act & ~vsd_sel);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -235,7 +234,8 @@ localparam CONF_STR = {
 	"P2O89,Video Timings,ULA-48,ULA-128,Pentagon;",
 	"P2OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
 	"P2-;",
-	"P2OUV,MMC Card,DivMMC+ESXDOS,DivMMC,ZXMMC;",
+	"P2o01,MMC Mode,Auto(VHD),SD Card 14MHz,SD Card 28MHz;",
+	"P2OUV,MMC Version,DivMMC+ESXDOS,DivMMC,ZXMMC;",
 
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
@@ -275,6 +275,7 @@ reg  ce_cpu_tn;
 reg  ce_tape;
 reg  ce_wd1793;
 reg  ce_u765;
+reg  ce_spi;
 
 wire ce_cpu_p = cpu_en & cpu_p;
 wire ce_cpu_n = cpu_en & cpu_n;
@@ -285,10 +286,10 @@ wire cpu_n = ~&turbo ? ce_cpu_tn : ce_cpu_sn;
 always @(posedge clk_sys) begin
 	reg [5:0] counter = 0;
 
-	counter <=  counter + 1'd1;
+	counter   <=  counter + 1'd1;
 
-	ce_7mp  <= !counter[3] & !counter[2:0];
-	ce_7mn  <=  counter[3] & !counter[2:0];
+	ce_7mp    <= !counter[3] & !counter[2:0];
+	ce_7mn    <=  counter[3] & !counter[2:0];
 
 	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
@@ -297,8 +298,9 @@ always @(posedge clk_sys) begin
 	ce_u765   <= !(counter & turbo) & cpu_en;
 
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
-end
 
+	ce_spi    <= vsd_sel | ((status[33] | !counter[1]) & !counter[0]);
+end
 
 wire [4:0] turbo_req;
 always_comb begin
@@ -362,7 +364,7 @@ wire [15:0] joystick_0;
 wire [15:0] joystick_1;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
-wire [31:0] status;
+wire [63:0] status;
 
 wire 			sd_rd_plus3;
 wire 			sd_wr_plus3;
@@ -398,9 +400,6 @@ wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
-reg         status_set;
-reg  [31:0] status_out;
-
 wire [21:0] gamma_bus;
 
 hps_io #(.STRLEN(($size(CONF_STR)>>3)+5), .VDNUM(2)) hps_io
@@ -420,7 +419,7 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5), .VDNUM(2)) hps_io
 	.status(status),
 	.status_menumask({en1080p,|vcrop,~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset),
-	.status_in({status[31:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
+	.status_in({status[63:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -465,9 +464,9 @@ wire        nRFSH;
 wire        nBUSACK;
 wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
-wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10] | img_mounted[1];
+wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10] | mmc_reset;
 
-wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset | snap_reset | img_mounted[1];
+wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset | snap_reset | mmc_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
 wire        shdw_reset = (mod[2:1] == 3) & Fn[11] & ~plus3;
 
@@ -485,7 +484,7 @@ T80pa cpu
 	.CLK(clk_sys),
 	.CEN_p(ce_cpu_p),
 	.CEN_n(ce_cpu_n),
-	.WAIT_n(1),
+	.WAIT_n(mmc_ready),
 	.INT_n(nINT),
 	.NMI_n(~NMI),
 	.BUSRQ_n(nBUSRQ),
@@ -1061,22 +1060,28 @@ end
 //////////////////   MMC   //////////////////
 
 reg [1:0] mmc_mode;
+reg       vsd_sel = 0;
 always @(posedge clk_sys) begin
-	if(img_mounted[1]) mmc_mode <= img_size ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00;
-	if(RESET) mmc_mode <= 0;
+	reg vhd_en = 0;
+
+	if(img_mounted[1]) vhd_en <= |img_size;
+	if(RESET) vhd_en <= 0;
+	
+	if(reset) begin
+		vsd_sel  <= (vhd_en && !status[33:32]);
+		mmc_mode <= (vhd_en || status[33:32]) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00;
+	end
 end
 
-wire        mmc_sel;
-wire  [7:0] mmc_dout;
-wire        mmc_mem_en;
-wire        mmc_rom_en;
-wire        mmc_ram_en;
-wire  [3:0] mmc_ram_bank;
+wire       mmc_reset = (img_mounted[1] & !status[33:32]);
 
-wire        spi_ss;
-wire        spi_clk;
-wire        spi_di;
-wire        spi_do;
+wire       mmc_sel;
+wire [7:0] mmc_dout;
+wire       mmc_mem_en;
+wire       mmc_rom_en;
+wire       mmc_ram_en;
+wire [3:0] mmc_ram_bank;
+wire       mmc_ready;
 
 divmmc divmmc
 (
@@ -1086,11 +1091,24 @@ divmmc divmmc
 	.din(cpu_dout),
 	.dout(mmc_dout),
 	.active_io(mmc_sel),
+	.ready(mmc_ready),
 
 	.rom_active(mmc_rom_en),
 	.ram_active(mmc_ram_en),
-	.ram_bank(mmc_ram_bank)
+	.ram_bank(mmc_ram_bank),
+	
+	.spi_ce(ce_spi),
+	.spi_ss(sdss),
+	.spi_clk(sdclk),
+	.spi_di(sdmiso),
+	.spi_do(sdmosi)
 );
+
+wire sdss;
+wire sdclk;
+wire vsdmiso;
+wire sdmosi;
+wire sdmiso = vsd_sel ? vsdmiso : SD_MISO; 
 
 sd_card sd_card
 (
@@ -1105,11 +1123,33 @@ sd_card sd_card
 	.sd_buff_wr(sd_buff_wr),
 
 	.clk_spi(clk_sys),
-	.ss(spi_ss),
-	.sck(spi_clk),
-	.mosi(spi_do),
-	.miso(spi_di)
+	.ss(sdss | ~vsd_sel),
+	.sck(sdclk),
+	.mosi(sdmosi),
+	.miso(vsdmiso)
 );
+
+assign SD_CS   = sdss   |  vsd_sel;
+assign SD_SCK  = sdclk  & ~vsd_sel;
+assign SD_MOSI = sdmosi & ~vsd_sel;
+
+reg sd_act;
+always @(posedge clk_sys) begin
+	reg old_mosi, old_miso;
+	integer timeout = 0;
+
+	old_mosi <= sdmosi;
+	old_miso <= sdmiso;
+
+	sd_act <= 0;
+	if(timeout < 1000000) begin
+		timeout <= timeout + 1;
+		sd_act <= 1;
+	end
+
+	if((old_mosi ^ sdmosi) || (old_miso ^ sdmiso)) timeout <= 0;
+end
+ 
 
 ///////////////////   FDC   ///////////////////
 reg         plusd_en;
