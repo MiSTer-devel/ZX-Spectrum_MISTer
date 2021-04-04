@@ -200,16 +200,15 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XX
 
 `include "build_id.v"
 localparam CONF_STR = {
 	"Spectrum;;",
-	"-;",
 	"S0,TRDIMGDSKMGT,Load Disk;",
 	"F2,TAPCSWTZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
-	"S1,VHD,Mount DivMMC;",
+	"S1,VHD,Load DivMMC;",
 	"-;",
 
 	"P1,Audio & Video;",
@@ -241,6 +240,7 @@ localparam CONF_STR = {
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"-;",
 	"O6,Fast Tape Load,On,Off;",
+	"O1,Tape Sound,On,Off;",
 	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
 	"-;",
 	"R0,Reset & Apply;",
@@ -863,8 +863,8 @@ endfunction
 reg [15:0] audio_l, audio_r;
 always @(posedge clk_aud) begin
 	reg [15:0] pre_l, pre_r;
-	pre_l <= {ts_l,4'd0} + {{3{gs_l[14]}}, gs_l[13:1]} + {2'b00, saa_l, 6'd0} + {3'b000, ear_out, mic_out, tape_in, 10'd0};
-	pre_r <= {ts_r,4'd0} + {{3{gs_r[14]}}, gs_r[13:1]} + {2'b00, saa_r, 6'd0} + {3'b000, ear_out, mic_out, tape_in, 10'd0};
+	pre_l <= {ts_l,4'd0} + {{3{gs_l[14]}}, gs_l[13:1]} + {2'b00, saa_l, 6'd0} + {3'b000, ear_out, mic_out, tape_aud, 10'd0};
+	pre_r <= {ts_r,4'd0} + {{3{gs_r[14]}}, gs_r[13:1]} + {2'b00, saa_r, 6'd0} + {3'b000, ear_out, mic_out, tape_aud, 10'd0};
 
 	audio_l <= compr(pre_l);
 	audio_r <= compr(pre_r);
@@ -1345,24 +1345,21 @@ smart_tape tape
 	.dout(tape_dout)
 );
 
-reg tape_loaded_reg = 0;
+reg tape_act = 0;
 always @(posedge clk_sys) begin
 	int timeout = 0;
+	reg old_vin;
 	
-	if(tape_loaded) begin
-		tape_loaded_reg <= 1;
-		timeout <= 100000000;
-	end else begin
-		if(timeout) begin
-			timeout <= timeout - 1;
-		end else begin
-			tape_loaded_reg <= 0;
-		end
-	end
+	old_vin <= tape_vin;
+
+	tape_act <= 1;
+	if(old_vin ^ tape_vin) timeout <= 50000000;
+	else if(timeout) timeout <= timeout - 1;
+	else tape_act <= 0;
 end
 
-wire tape_in = tape_loaded_reg ? ~tape_vin : tape_adc_act & ~tape_adc;
-wire ula_tape_in = tape_in | ear_out | (~status[7] & mic_out);
+wire tape_aud    = ~status[1] & (tape_act ? ~tape_vin : tape_adc_act & ~tape_adc);
+wire ula_tape_in = tape_act ? ~tape_vin : tape_adc_act ? ~tape_adc : (ear_out | (~status[7] & mic_out));
 
 wire tape_adc, tape_adc_act;
 ltc2308_tape ltc2308_tape
