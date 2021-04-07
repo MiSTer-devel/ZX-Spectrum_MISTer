@@ -63,8 +63,6 @@ reg       rx_strobe;
 
 always @(posedge clk_sys) begin
 
-	reg m1_trigger;
-
 	rx_strobe <= 0;
 	tx_strobe <= 0;
 
