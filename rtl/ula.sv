@@ -189,22 +189,22 @@ always @(posedge clk_sys) begin
 		if(!Border_next) begin
 			casez({tmx_cfg[1],hc_next[3:0]})
 				5'b01000,
-				5'b01100: vaddr <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],vc[7:6],vc[2:0],vc[5:3],hc_next[7:4], hc_next[2]};
+				5'b01100: vaddr <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],vc[7:6],vc[2:0],vc[5:3],hc_next[7:4],hc_next[2]};
 				5'b11000,
 				5'b11100: vaddr <= {stdpage ? page_scr : tmx_cfg[0],1'b0,vc[7:6],vc[2:0],vc[5:3],hc_next[7:4], hc_next[2]};
 				5'b?1001,
 				5'b?1101: begin bits <= vram_dout; ff_data <= vram_dout; end
 				5'b01010,
-				5'b01110: vaddr <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],3'b110,vc[7:3],hc_next[7:4],hc_next[2]};
+				5'b01110: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],3'b110,vc[7:5]};  // only CAS
 				5'b11010,
-				5'b11110: vaddr <= {stdpage ? page_scr : tmx_cfg[0],1'b1,vc[7:6],vc[2:0],vc[5:3],hc_next[7:4], hc_next[2]};
+				5'b11110: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[0],1'b1,vc[7:6],vc[2:0],vc[5]}; // only CAS
 				5'b?1011,
 				5'b?1111: begin attr <= vram_dout; ff_data <= vram_dout; end
 				default: ;
 			endcase
 
 			// Snow effect
-			if (mZX & ~nMREQ & contendAddr & snow_ena) vaddr[6:0] <= addr[6:0];
+			if (mZX & ~nMREQ & ~nRFSH & contendAddr & snow_ena) vaddr[6:0] <= addr[6:0]; // RAS got replaced
 		end
 
 		if (hc_next[3:0] == 1) ff_data <= 255;
