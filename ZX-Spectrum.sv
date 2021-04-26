@@ -200,7 +200,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -238,7 +238,7 @@ localparam CONF_STR = {
 
 	"-;",
 	"OHJ,Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
-	"-;",
+	"o23,Mouse,Disabled,Kempston L/R,Kempston R/L;",
 	"O6,Fast Tape Load,On,Off;",
 	"O1,Tape Sound,On,Off;",
 	"OMO,CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
@@ -360,8 +360,8 @@ end
 wire [10:0] ps2_key;
 wire [24:0] ps2_mouse;
 
-wire [15:0] joystick_0;
-wire [15:0] joystick_1;
+wire [15:0] joy0;
+wire [15:0] joy1;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [63:0] status;
@@ -412,8 +412,8 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5), .VDNUM(2)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
 
-	.joystick_0(joystick_0),
-	.joystick_1(joystick_1),
+	.joystick_0(joy0),
+	.joystick_1(joy1),
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
@@ -453,7 +453,6 @@ end
 
 ///////////////////   CPU   ///////////////////
 wire [15:0] addr;
-wire  [7:0] cpu_din;
 wire  [7:0] cpu_dout;
 wire        nM1;
 wire        nMREQ;
@@ -504,22 +503,19 @@ T80pa cpu
 	.DIRSet(snap_REGSet)
 );
 
-always_comb begin
-	casex({nMREQ, tape_dout_en, ~nM1 | nIORQ | nRD, fdd_sel | fdd_sel2 | plus3_fdd, mf3_port, mmc_sel, addr[5:0]==6'h1F, portBF, gs_sel, psg_enable, ulap_sel, addr[0]})
-		'b01XXXXXXXXXX: cpu_din = tape_dout;
-		'b00XXXXXXXXXX: cpu_din = ram_dout;
-		'b1X01XXXXXXXX: cpu_din = fdd_dout;
-		'b1X001XXXXXXX: cpu_din = (addr[14:13] == 2'b11 ? page_reg : page_reg_plus3);
-		'b1X0001XXXXXX: cpu_din = mmc_dout;
-		'b1X00001XXXXX: cpu_din = mouse_sel ? mouse_data : {2'b00, joyk};
-		'b1X000001XXXX: cpu_din = {page_scr_copy, 7'b1111111};
-		'b1X0000001XXX: cpu_din = gs_dout;
-		'b1X00000001XX: cpu_din = (addr[14] ? sound_data : 8'hFF);
-		'b1X000000001X: cpu_din = ulap_dout;
-		'b1X0000000000: cpu_din = {1'b1, ula_tape_in, 1'b1, key_data[4:0] & joy_kbd};
-		       default: cpu_din = port_ff;
-	endcase
-end
+wire [7:0] cpu_din =  
+		~nMREQ   ? (tape_dout_en ? tape_dout : ram_dout)      :
+		~io_rd   ? port_ff                                    :
+		fdc_sel  ? fdc_dout                                   :
+		mf3_port ? (&addr[14:13] ? page_reg : page_reg_plus3) :
+		mmc_sel  ? mmc_dout                                   :
+		kemp_sel ? kemp_dout                                  :
+		portBF   ? {page_scr_copy, 7'b1111111}                :
+		gs_sel   ? gs_dout                                    :
+		psg_rd   ? psg_dout                                   :
+		ulap_sel ? ulap_dout                                  :
+		~addr[0] ? {1'b1, ula_tape_in, 1'b1, kbd_dout}        :
+					  port_ff;
 
 reg init_reset = 1;
 always @(posedge clk_sys) begin
@@ -722,10 +718,11 @@ end
 
 
 ////////////////////   AUDIO   ///////////////////
-wire  [7:0] sound_data;
+wire  [7:0] psg_dout;
 wire [11:0] ts_l, ts_r;
-wire        psg_enable = addr[0] & addr[15] & ~addr[1];
-wire        psg_we     = psg_enable & ~nIORQ & ~nWR & nM1;
+wire        psg_sel = /*addr[0] &*/ addr[15] & ~addr[1];
+wire        psg_we  = psg_sel & ~nIORQ & ~nWR & nM1;
+wire        psg_rd  = psg_sel & addr[14];
 reg         psg_reset;
 reg         psg_active;
 
@@ -753,7 +750,7 @@ turbosound turbosound
 	.BDIR(psg_we),
 	.BC(addr[14]),
 	.DI(cpu_dout),
-	.DO(sound_data),
+	.DO(psg_dout),
 	.CHANNEL_L(ts_l),
 	.CHANNEL_R(ts_r)
 );
@@ -884,7 +881,7 @@ wire        ulap_sel;
 wire  [7:0] ulap_dout;
 
 reg mZX, m128;
-always_comb begin
+always @(posedge clk_sys) begin
 	case(status[9:8])
 		      0: {mZX, m128} <= 2'b10;
 		      1: {mZX, m128} <= 2'b11;
@@ -1002,35 +999,43 @@ wire  [2:0] mod;
 wire  [4:0] key_data;
 keyboard kbd( .* );
 
-reg         mouse_sel;
 wire  [7:0] mouse_data;
-mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(), .dout(mouse_data));
+mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(), .dout(mouse_data), .btn_swap(status[35]));
 
+wire       kemp_sel = addr[5:0] == 6'h1F;
+reg  [7:0] kemp_dout;
+reg        kemp_mode = 0;
 always @(posedge clk_sys) begin
 	reg old_status = 0;
-	old_status <= ps2_mouse[24];
 
-	if(joyk) mouse_sel <= 0;
-	if(old_status != ps2_mouse[24]) mouse_sel <= 1;
+	if(reset || joyk || !status[35:34]) kemp_mode <= 0;
+
+	old_status <= ps2_mouse[24];
+	if(old_status != ps2_mouse[24] && status[35:34]) kemp_mode <= 1;
+
+	kemp_dout <= kemp_mode ? mouse_data : {2'b00, joyk};
 end
 
-wire [2:0] jsel = status[19:17];
+wire [2:0] jsel  = status[19:17];
 
 //kempston port 1F
-wire [5:0] joyk   = !jsel ? (joystick_0[5:0] | joystick_1[5:0]) : 6'd0;
+wire [5:0] joyk  = !jsel ? (joy0[5:0] | joy1[5:0]) : 6'd0;
 
 //sinclair 1 67890
-wire [4:0] joys1 = ({5{jsel[0]}} & {joystick_0[1:0], joystick_0[2], joystick_0[3], joystick_0[4]}) | ({5{jsel[1:0]==1}} & {joystick_1[1:0], joystick_1[2], joystick_1[3], joystick_1[4]});
+wire [4:0] joys1 = ({5{jsel[0]}} & {joy0[1:0], joy0[2], joy0[3], joy0[4]}) | ({5{jsel[1:0]==1}} & {joy1[1:0], joy1[2], joy1[3], joy1[4]});
 
 //sinclair 2 12345
-wire [4:0] joys2 = ({5{jsel[1]}} & {joystick_1[4:2], joystick_1[0], joystick_1[1]})                | ({5{jsel[1:0]==2}} & {joystick_0[4:2],joystick_0[0],joystick_0[1]});
+wire [4:0] joys2 = ({5{jsel[1]}} & {joy1[4:2], joy1[0], joy1[1]})          | ({5{jsel[1:0]==2}} & {joy0[4:2],joy0[0],joy0[1]});
 
 //cursor 56780
-wire [4:0] joyc1 = {5{jsel[2]}} & ({joystick_0[2], joystick_0[3], joystick_0[0],1'b0, joystick_0[4]} | {joystick_1[2], joystick_1[3], joystick_1[0], 1'b0, joystick_1[4]});
-wire [4:0] joyc2 = {5{jsel[2]}} & {joystick_0[1] | joystick_1[1], 4'b0000};
+wire [4:0] joyc1 = {5{jsel[2]}} & ({joy0[2], joy0[3], joy0[0],1'b0, joy0[4]} | {joy1[2], joy1[3], joy1[0], 1'b0, joy1[4]});
+wire [4:0] joyc2 = {5{jsel[2]}} & {joy0[1] | joy1[1], 4'b0000};
 
 //map to keyboard
 wire [4:0] joy_kbd = ({5{addr[12]}} | ~(joys1 | joyc1)) & ({5{addr[11]}} | ~(joys2 | joyc2));
+
+reg  [4:0] kbd_dout;
+always @(posedge clk_sys) kbd_dout <= key_data & joy_kbd;
 
 //////////////////   MF128   ///////////////////
 reg         mf128_mem;
@@ -1174,7 +1179,8 @@ reg         plus3_fdd_ready;
 wire        plus3_fdd = ~addr[1] & addr[13] & ~addr[14] & ~addr[15] & plus3 & ~page_disable;
 wire [7:0]  u765_dout;
 
-wire  [7:0] fdd_dout = plus3_fdd ? u765_dout : wdc_dout; 
+wire  [7:0] fdc_dout = plus3_fdd ? u765_dout : wdc_dout; 
+wire        fdc_sel  = fdd_sel | fdd_sel2 | plus3_fdd;
 
 //
 // current +D implementation notes:
