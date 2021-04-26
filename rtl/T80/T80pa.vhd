@@ -83,6 +83,7 @@ entity T80pa is
         A           : out std_logic_vector(15 downto 0);
         DI          : in  std_logic_vector(7 downto 0);
         DO          : out std_logic_vector(7 downto 0);
+        R800_mode   : in  std_logic := '0';
         REG         : out std_logic_vector(211 downto 0); -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
         DIRSet      : in  std_logic := '0';
         DIR         : in  std_logic_vector(211 downto 0) := (others => '0') -- IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
@@ -135,6 +136,7 @@ begin
             MC      => MCycle,
             TS      => TState,
             OUT0    => OUT0,
+            R800_mode => R800_mode,
             IntCycle_n => IntCycle_n,
             DIRSet  => DIRSet,
             DIR     => DIR
