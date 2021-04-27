@@ -43,8 +43,6 @@ module ULA
 	input         nRD,
 	input         nWR,
 	output        nINT,
-	output        nPortRD,
-	output        nPortWR,
 
 	// VRAM interfacing
 	output [14:0] vram_addr,
@@ -83,8 +81,6 @@ module ULA
 assign vram_addr = vaddr;
 assign nINT      = ~INT;
 assign port_ff   = tmx_using_ff ? {2'b00, tmx_cfg} : mZX ? ff_data : 8'hFF;
-assign nPortRD   = addr[0] | nIORQ | ioreqtw3 | nRD;
-assign nPortWR   = addr[0] | nIORQ | ioreqtw3 | nWR;
 
 // Pixel clock
 reg  [8:0] hc = 0;
@@ -172,7 +168,7 @@ always @(posedge clk_sys) begin
 		if(INT)  INTCnt <= ((m128 && INTCnt == 71) || (~m128 && INTCnt == 63)) ? 7'd0 : (INTCnt + 1'd1);
 		if(INTCnt == 0) INT <= 0;
 
-		if ((hc_next[3:0] == 4) || (hc_next[3:0] == 12)) begin
+		if(hc_next[2:0] == 4) begin
 			SRegister <= VidEN ? bits : 8'd0;
 			hiSRegister <= VidEN ? {bits, attr} : 16'd0;
 			AttrOut <= tmx_hi ? hiattr : VidEN ? attr : {2'b00,border_color,border_color};
@@ -186,25 +182,28 @@ always @(posedge clk_sys) begin
 
 		if(hc_next[3]) VidEN <= ~Border;
 	
-		if(!Border_next) begin
-			casez({tmx_cfg[1],hc_next[3:0]})
-				5'b01000,
-				5'b01100: vaddr <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],vc[7:6],vc[2:0],vc[5:3],hc_next[7:4],hc_next[2]};
-				5'b11000,
-				5'b11100: vaddr <= {stdpage ? page_scr : tmx_cfg[0],1'b0,vc[7:6],vc[2:0],vc[5:3],hc_next[7:4], hc_next[2]};
-				5'b?1001,
-				5'b?1101: begin bits <= vram_dout; ff_data <= vram_dout; end
-				5'b01010,
-				5'b01110: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],3'b110,vc[7:5]};  // only CAS
-				5'b11010,
-				5'b11110: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[0],1'b1,vc[7:6],vc[2:0],vc[5]}; // only CAS
-				5'b?1011,
-				5'b?1111: begin attr <= vram_dout; ff_data <= vram_dout; end
-				default: ;
+		if(~Border_next) begin
+			if(~tmx_cfg[1]) case(hc_next[3:0])
+				'h8,'hC: vaddr       <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],vc[7:6],vc[2:0],vc[5:3],hc_next[7:4],hc_next[2]};
+				'hA,'hE: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[2],tmx_cfg[0],3'b110,vc[7:5]};  // CAS and page(?) only
 			endcase
 
-			// Snow effect
-			if (mZX & ~nMREQ & ~nRFSH & contendAddr & snow_ena) vaddr[6:0] <= addr[6:0]; // RAS got replaced
+			if(tmx_cfg[1]) case(hc_next[3:0])
+				'h8,'hC: vaddr       <= {stdpage ? page_scr : tmx_cfg[0],1'b0,vc[7:6],vc[2:0],vc[5:3],hc_next[7:4], hc_next[2]};
+				'hA,'hE: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[0],1'b1,vc[7:6],vc[2:0],vc[5]}; // CAS and page(?) only
+			endcase
+
+			// Snow effect for ULA-48 only. ULA-128 has no snow bug.
+			if (mZX & ~m128 & ~nMREQ & ~nRFSH & contendAddr & snow_ena) case(hc_next[3:0])
+				'h8,'hC: vaddr[6:0] <= addr[6:0]; // only RAS got replaced
+			endcase
+
+			case(hc_next[3:0])
+				'h9,'hD: bits <= vram_dout;
+				'hB,'hF: attr <= vram_dout;
+			endcase
+
+			if(hc_next[3] & hc_next[0]) ff_data <= vram_dout;
 		end
 
 		if (hc_next[3:0] == 1) ff_data <= 255;

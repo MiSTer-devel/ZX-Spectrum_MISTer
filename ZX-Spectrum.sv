@@ -228,7 +228,7 @@ localparam CONF_STR = {
 	"P2O7,Port #FE,Issue 2,Issue 3;",
 	"P2OD,Port #FF,Timex,SAA1099;",
 	"P2OE,ULA+,Enabled,Disabled;",
-	"P2OP,Snow Bug,Disabled,Enabled;",
+	"D3P2OP,Snow Bug,Disabled,Enabled;",
 	"P2-;",
 	"P2O89,Video Timings,ULA-48,ULA-128,Pentagon;",
 	"P2OAC,Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
@@ -417,7 +417,7 @@ hps_io #(.STRLEN(($size(CONF_STR)>>3)+5), .VDNUM(2)) hps_io
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.status(status),
-	.status_menumask({en1080p,|vcrop,~need_apply}),
+	.status_menumask({|status[9:8],en1080p,|vcrop,~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset),
 	.status_in({status[63:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
@@ -707,7 +707,7 @@ reg       mic_out;
 
 always @(posedge clk_sys) begin
 	if(reset) {ear_out, mic_out} <= 2'b00;
-	else if(~ula_nWR) begin
+	else if(io_wr & ~addr[0]) begin
 		border_color <= cpu_dout[2:0];
 		ear_out <= cpu_dout[4]; 
 		mic_out <= cpu_dout[3];
@@ -897,9 +897,8 @@ wire       tmx_avail = ~status[13] & ~trdos_en;
 wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
-wire       ula_nWR;
 
-ULA ULA(.*, .nPortRD(), .nPortWR(ula_nWR), .din(cpu_dout), .page_ram(page_ram[2:0]));
+ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]));
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg ce_sys1;
