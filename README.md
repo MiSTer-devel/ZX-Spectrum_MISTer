@@ -31,6 +31,8 @@ Copy the *.rbf to the root folder, copy boot.rom to games/Spectrum/ on the SD ca
 In 48K mode use command **RANDOMIZE USR 15616** to enter TR-DOS. In +3 mode, enter to 48K mode from the +3 BASIC via the USR0 command,
 then issue **RANDOMIZE USR 15616**. Use command **RETURN** to leave TR-DOS.
 
+**Note:** Not all TRD have autostart and it's cumbersome way to enter TR-DOS from 48K mode, there is GLUK ROM included. So insert TRD/SCL dosk and press **F11**, you will enter to GLUK menu, then choose **GLUK BOOT** where you can select the file to boot. That's all.
+
 **IMG** is G+DOS image used with +D Disk interface. Although it's fully supported, i couldn't find any games on such disks. The main purpose of these images is to use snapshot function of +D and Multiface.
 
 **MGT** is G+DOS and MasterDOS (SAM Coupe) image. It's similar to IMG but uses different layout. The main purpose is to transfer data to/from SAM Coupe.
