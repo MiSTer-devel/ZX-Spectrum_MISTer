@@ -270,6 +270,10 @@ always @(posedge clk_sys) begin
 			8'h0E : keys[4][3] <= release_btn; // ` ~ give `
 			8'h7C : keys[7][4] <= release_btn; // numeric *
 			8'h5D : keys[7][4] <= release_btn; // \ | give *
+			8'h0D : begin // G mode
+					keys[0][0] <= release_btn;
+					keys[4][1] <= release_btn;
+				end
 			default: ;
 		endcase
 	end
