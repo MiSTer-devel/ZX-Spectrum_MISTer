@@ -54,6 +54,7 @@ module emu
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
+	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
@@ -183,6 +184,7 @@ assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
 assign VGA_SCALER= 0;
+assign HDMI_FREEZE = 0;
 
 localparam ARCH_ZX48  = 5'b011_00; // ZX 48
 localparam ARCH_ZX128 = 5'b000_01; // ZX 128/+2
@@ -381,13 +383,13 @@ wire        sd_wr_mmc;
 wire [31:0] sd_lba_mmc;
 wire [7:0]  sd_buff_din_mmc;
 
-wire [31:0] sd_lba = (sd_wr[0]|sd_rd[0]) ? (plus3_fdd_ready ? sd_lba_plus3 : sd_lba_wd) : sd_lba_mmc;
+wire [31:0] sd_lba[2] = '{plus3_fdd_ready ? sd_lba_plus3 : sd_lba_wd, sd_lba_mmc};
 wire  [1:0] sd_rd = {sd_rd_mmc, plus3_fdd_ready ? sd_rd_plus3 : sd_rd_wd};
 wire  [1:0] sd_wr = {sd_wr_mmc, plus3_fdd_ready ? sd_wr_plus3 : sd_wr_wd};
 wire  [1:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din = sd_ack[0] ? (plus3_fdd_ready ? sd_buff_din_plus3 : sd_buff_din_wd) : sd_buff_din_mmc;
+wire  [7:0] sd_buff_din[2] = '{plus3_fdd_ready ? sd_buff_din_plus3 : sd_buff_din_wd, sd_buff_din_mmc};
 wire        sd_buff_wr;
 wire  [1:0] img_mounted;
 wire [63:0] img_size;
@@ -402,12 +404,10 @@ wire        ioctl_wait;
 
 wire [21:0] gamma_bus;
 
-hps_io #(.STRLEN(($size(CONF_STR)>>3)+5), .VDNUM(2)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-
-	.conf_str({CONF_STR, plus3_fdd_ready ? CONF_PLUS3 : plusd_en ? CONF_PLUSD : CONF_BDI}),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
@@ -971,6 +971,7 @@ video_mixer #(.LINE_LENGTH(896), .GAMMA(1)) video_mixer
 	.*,
 	.hq2x(scale == 1),
 	.scandoubler(scale || forced_scandoubler),
+	.freeze_sync(),
 
 	.VGA_DE(vga_de),
 	.HSync(hs),
