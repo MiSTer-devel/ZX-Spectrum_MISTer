@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -927,7 +927,7 @@ always @(posedge CLK_VIDEO) if (ce_pix) begin
 	vbl <= VBlank;
 
 	casex({ulap_ena, ulap_mono})
-		'b0X: {Gx,Rx,Bx} <= {G, {3{I & G}}, G, {3{I & G}}, R, {3{I & R}}, R, {3{I & R}}, B, {3{I & B}}, B, {3{I & B}}};
+		'b0X: {Gx,Rx,Bx} <= {G, G, {6{I & G}}, R, R, {6{I & R}}, B, B, {6{I & B}}};
 		'b10: {Gx,Rx,Bx} <= {{2{ulap_color[7:5]}}, ulap_color[7:6], {2{ulap_color[4:2]}}, ulap_color[4:3], {4{ulap_color[1:0]}}};
 		'b11: {Gx,Rx,Bx} <= {3{ulap_color}};
 	endcase
