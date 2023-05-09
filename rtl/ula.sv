@@ -69,6 +69,7 @@ module ULA
 	input   [2:0] page_ram,
 	input   [2:0] border_color,
 	input         wide,
+        input         hide_border,
 
 	// Video outputs
 	output reg    HSync,
@@ -129,36 +130,36 @@ always @(posedge clk_sys) begin
 			end
 		end
 
-		if(!mZX) begin
-			if (hc_next == 312) HBlank <= 1;
-				else if (hc_next == 420) HBlank <= 0;
+		if(!mZX) begin       //pentagon
+			if ((hc_next == 312) || (hc_next == 268 && hide_border)) HBlank <= 1;
+				else if ((hc_next == 420 && !hide_border) || (hc_next == 12)) HBlank <= 0;
 			if (hc_next == 338) HSync <= 1;
 				else if (hc_next == 370) HSync <= 0;
-		end else if(m128) begin
-			if (hc_next == 312) HBlank <= 1;
-				else if (hc_next == 424) HBlank <= 0;
+		end else if(m128) begin      //128
+			if ((hc_next == 312) || (hc_next == 268 && hide_border)) HBlank <= 1;
+				else if ((hc_next == 424 && !hide_border) || (hc_next == 12)) HBlank <= 0;
 			if (hc_next == 340) HSync <= 1;         //ULA 6C
 				else if (hc_next == 372) HSync <= 0; //ULA 6C
-		end else begin
-			if (hc_next == 312) HBlank <= 1;
-				else if (hc_next == 416) HBlank <= 0;
+		end else begin               //48
+			if ((hc_next == 312) || (hc_next == 268 && hide_border)) HBlank <= 1;
+				else if ((hc_next == 416 && !hide_border) || (hc_next == 12)) HBlank <= 0;
 			if (hc_next == 336) HSync <= 1;         //ULA 5C
 				else if (hc_next == 368) HSync <= 0; //ULA 5C
 		end
 
-		if(mZX) begin
+		if(mZX) begin               //48 or 128
 			if(vc_next == 240) VSync <= 1;
 				else if (vc_next == 244) VSync <= 0;
-			if(vc_next == 236) VBlank <= 1;
-				else if(vc == 264) VBlank <= 0;
-		end else begin
+			if((vc_next == 236) || (vc_next == 192 && hide_border)) VBlank <= 1;
+				else if((vc == 264 && !hide_border) || (vc_next == 0)) VBlank <= 0;
+		end else begin             //pentagon
 			if(vc_next == 248) VSync <= 1;
 				else if (vc_next == 256) VSync <= 0;
-			if(vc_next == 236) VBlank <= 1;
-				else if(vc_next == 272) VBlank <= 0;
+			if((vc_next == 236) || (vc_next == 192 && hide_border)) VBlank <= 1;
+				else if((vc_next == 272 && !hide_border) || (vc_next == 0)) VBlank <= 0;
 		end
 
-		if(wide) begin
+		if(wide && !hide_border) begin
 			HBlank <= !(hc_next < 290 || hc_next >= ((mZX && m128) ? 455-11 : 447-11));
 		end
 
