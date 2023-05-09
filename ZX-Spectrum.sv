@@ -204,7 +204,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXX
+//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -220,6 +220,7 @@ localparam CONF_STR = {
 	"P1O45,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"P1-;",
+        "P1o6,Hide Border,No,Yes;",
 	"H2d1P1OS,Vertical Crop,No,Yes;",
 	"h2d1P1OST,Vertical Crop,No,270,216;",
 	"P1OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -900,6 +901,7 @@ wire       tmx_avail = ~status[13] & ~trdos_en;
 wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
+wire       hide_border = status[38];
 
 ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]));
 
@@ -962,8 +964,8 @@ video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
-	.ARX((!ar) ? (wide ? 12'd2903 : 12'd3307) : (ar - 1'd1)),
-	.ARY((!ar) ? 12'd2588 : 12'd0),
+	.ARX((!ar) ? (hide_border ? 12'd45 : (wide ? 12'd2903 : 12'd3307)) : (ar - 1'd1)),
+	.ARY((!ar) ? (hide_border ? 12'd32 : 12'd2588) : 12'd0),
 	.CROP_SIZE(vcrop_en ? vcrop : 10'd0),
 	.CROP_OFF(0),
 	.SCALE(status[27:26])
