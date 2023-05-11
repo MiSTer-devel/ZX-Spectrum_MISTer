@@ -68,7 +68,7 @@ module ULA
 	input         page_scr,
 	input   [2:0] page_ram,
 	input   [2:0] border_color,
-	input         wide,
+	input   [1:0] wide,
 
 	// Video outputs
 	output reg    HSync,
@@ -150,7 +150,7 @@ always @(posedge clk_sys) begin
 			if(vc_next == 240) VSync <= 1;
 				else if (vc_next == 244) VSync <= 0;
 			if(vc_next == 236) VBlank <= 1;
-				else if(vc == 264) VBlank <= 0;
+				else if(vc_next == 264) VBlank <= 0;
 		end else begin
 			if(vc_next == 248) VSync <= 1;
 				else if (vc_next == 256) VSync <= 0;
@@ -158,9 +158,13 @@ always @(posedge clk_sys) begin
 				else if(vc_next == 272) VBlank <= 0;
 		end
 
-		if(wide) begin
-			HBlank <= !(hc_next < 290 || hc_next >= ((mZX && m128) ? 455-11 : 447-11));
-		end
+		case(wide)
+			1: HBlank <= !(hc_next < 290 || hc_next >= ((mZX && m128) ? 455-11 : 447-11));
+			2: begin
+					HBlank <= hc_next >= 278 || hc_next < 2;
+					VBlank <= (vc_next >= 204) && (mZX ? (m128 ? (vc <= 298) : (vc <= 299)) : (vc_next <= 307));
+				end
+		endcase
 
 		if( mZX && (vc_next == 248) && (hc_next == (m128 ? 8 : 4))) INT <= 1;
 		if(!mZX && (vc_next == 239) && (hc_next == 326)) INT <= 1;

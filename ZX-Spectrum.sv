@@ -204,7 +204,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXX
+//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -220,6 +220,7 @@ localparam CONF_STR = {
 	"P1O45,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"P1-;",
+	"P1o6,Narrow Border,No,Yes;",
 	"H2d1P1OS,Vertical Crop,No,Yes;",
 	"h2d1P1OST,Vertical Crop,No,270,216;",
 	"P1OQR,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -419,6 +420,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 	.joystick_1(joy1),
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
+	.new_vmode(new_vmode),
 	.status(status),
 	.status_menumask({|status[9:8],en1080p,|vcrop,~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset),
@@ -937,10 +939,11 @@ always @(posedge CLK_VIDEO) if (ce_pix) begin
 end
 
 reg [9:0] vcrop;
-reg wide;
+reg [1:0] wide;
 always @(posedge CLK_VIDEO) begin
 	vcrop <= 0;
-	wide <= 0;
+	wide[0] <= 0;
+	wide[1] <= status[38] & ~vcrop_en;
 	if(HDMI_WIDTH >= (HDMI_HEIGHT + HDMI_HEIGHT[11:1]) && !forced_scandoubler && !scale) begin
 		if(HDMI_HEIGHT == 480)  vcrop <= 240;
 		if(HDMI_HEIGHT == 600)  begin vcrop <= 200; wide <= vcrop_en; end
@@ -962,7 +965,7 @@ video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
-	.ARX((!ar) ? (wide ? 12'd2903 : 12'd3307) : (ar - 1'd1)),
+	.ARX((!ar) ? (wide[0] ? 12'd2903 : 12'd3307) : (ar - 1'd1)),
 	.ARY((!ar) ? 12'd2588 : 12'd0),
 	.CROP_SIZE(vcrop_en ? vcrop : 10'd0),
 	.CROP_OFF(0),
