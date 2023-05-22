@@ -125,3 +125,25 @@ CPU speed will reset to original.
 
 ### Download precompiled binaries and system ROMs:
 Go to [releases](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases) folder.
+
+### boot.rom Structure
+
+boot.rom is a collection of required ROMs, however it does not contain a full set of ROMs for each supported machine and/or hardware, it only includes the necessary subset.
+
+| N | Base Offset (Hex) | Chunk Size (Hex) | SHA1 Of the Original | Description |
+| ---: | ---: | ---: | :---: | :--- | 
+|  1 | 00000 | 4000 | 5f40f5af51c4c1e9083eac095349d7518545b0e0 | glukpen.rom Mr Gluk Boot Service version 6.61 |
+|  2 | 04000 | 4000 | ??? (doesn't match known 5.04t or 5.04t-bugfixed) | TR-DOS 5.04T |
+|  3 | 08000 | 4000 | d07fcdeca892ee80494d286ea9ea5bf3928a1aca | 128p-0.rom (128K editor and menu), the first half of the Pentagon 128 ROM |
+|  4 | 0C000 | 4000 | 80080644289ed93d71a1103992a154cc9802b2fa | 128-1.rom English 128 ROM 1 (48K BASIC) |
+|  5 | 10000 | 4000 | 62ec15a4af56cd1d206d0bd7011eac7c889a595d | plus3-4.1-english-0.rom English +2B/+3B v4.1 ROM 0 (128K editor) |
+|  6 | 14000 | 4000 | 1a7812c383a3701e90e88d1da086efb0c033ac72 | plus3-4.1-english-1.rom English +2B/+3B v4.1 ROM 1 (128K syntax checker) |
+|  7 | 18000 | 4000 | 8df145d10ff78f98138682ea15ebccb2874bf759 | plus3-4.1-english-2.rom English +2B/+3B v4.1 ROM 2 (+3DOS) |
+|  8 | 1C000 | 4000 | be365f331942ec7ec35456b641dac56a0dbfe1f0 | plus3-4.1-english-3.rom English +2B/+3B v4.1 ROM 3 (48K BASIC) |
+|  9 | 20000 | 2000 | 6b841dc5797ef7eb219ad455cd1e434ca3b9d30d | plusd-1.A.rom MGT's +D disk interface ROM v1.A |
+| 10 | 22000 | 2000 | **CUSTOM** | plusd-sys.bin MODIFIED version of the +D system code, based on the chunk CONFIG2 from "Plus D System Tape" |
+| 11 | 24000 | 2000 | 8df204ab490b87c389971ce0c7fb5f9cbd281f14 | mf128-87.2.rom (CRC32: 78ec8cfd) Miltuface 128 (87.2) |
+| 12 | 26000 | 2000 | 926425b3e84180683f0872aee9ebf6f4b9dfaf5f | genie128-2.rom GENIE 128K V2.1, the second half of the Genie 128 Disassembler ROM |
+| 13 | 28000 | 2000 | 5d74d2e2e5a537639da92ff120f8a6d86f474495 | mf3-3.C.rom (CRC32: 2d594640) Multiface 3 (3.C) |
+| 14 | 2A000 | 2000 | N/A | zeroes.bin unused 8K, padding for the MF3 ROM to fill remaining space in 16K block |
+| 15 | 2C000 | 4000 | 5ea7c2b824672e914525d1d5c419d71b84a426a2 | 48.rom BASIC for 16/48K models |
