@@ -31,9 +31,12 @@ module jt03(
     input           addr,
     input           cs_n,
     input           wr_n,
-    
+
+    input           psg_type,
+
     output  [7:0]   dout,
     output          irq_n,
+
     // Separated output
     output          [ 7:0] psg_A,
     output          [ 7:0] psg_B,
@@ -54,7 +57,9 @@ u_jt12(
     .addr           ( {1'b0, addr} ),
     .cs_n           ( cs_n         ),
     .wr_n           ( wr_n         ),
-    
+
+    .psg_type       ( psg_type     ),
+
     .dout           ( dout         ),
     .irq_n          ( irq_n        ),
     // Separated output

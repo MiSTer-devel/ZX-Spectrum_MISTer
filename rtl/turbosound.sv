@@ -26,6 +26,10 @@ module turbosound
 	input         CLK,		 // Global clock
 	input         CE,        // YM2203 Master Clock enable
 
+	input         ENABLE,
+	input         PSG_MIX,
+	input         PSG_TYPE,
+
 	input         BDIR,	    // Bus Direction (0 - read , 1 - write)
 	input         BC,		    // Bus control
 	input   [7:0] DI,	       // Data In
@@ -117,6 +121,7 @@ jt03 ym2203_0
 	.wr_n(~ym_wr),
 	.dout(DO_0),
 
+	.psg_type(PSG_TYPE),
 	.psg_A(psg_ch_a_0),
 	.psg_B(psg_ch_b_0),
 	.psg_C(psg_ch_c_0),
@@ -141,6 +146,7 @@ jt03 ym2203_1
 	.wr_n(~ym_wr),
 	.dout(DO_1),
 
+	.psg_type(PSG_TYPE),
 	.psg_A(psg_ch_a_1),
 	.psg_B(psg_ch_b_1),
 	.psg_C(psg_ch_c_1),
@@ -165,12 +171,12 @@ always @(posedge CLK) begin
 	psg_b <= sum_ch_b[8] ? 8'hFF : sum_ch_b[7:0];
 	psg_c <= sum_ch_c[8] ? 8'hFF : sum_ch_c[7:0];
 
-	psg_l <= {3'b000, psg_a, 1'd0} + {4'b0000, psg_b};
-	psg_r <= {3'b000, psg_c, 1'd0} + {4'b0000, psg_b};
+	psg_l <= {3'b000,                   psg_a, 1'd0} + {4'b0000, PSG_MIX ? psg_c : psg_b};
+	psg_r <= {3'b000, PSG_MIX ? psg_b : psg_c, 1'd0} + {4'b0000, PSG_MIX ? psg_c : psg_b};
 	opn_s <= {{2{opn_0[15]}}, opn_0[15:6]} + {{2{opn_1[15]}}, opn_1[15:6]};
 
-	ch_l <= fm_ena ? $signed(opn_s) + $signed(psg_l) : $signed(psg_l);
-	ch_r <= fm_ena ? $signed(opn_s) + $signed(psg_r) : $signed(psg_r);
+	ch_l <= ~ENABLE ? 12'd0 : fm_ena ? $signed(opn_s) + $signed(psg_l) : $signed(psg_l);
+	ch_r <= ~ENABLE ? 12'd0 : fm_ena ? $signed(opn_s) + $signed(psg_r) : $signed(psg_r);
 end
 
 assign CHANNEL_L = ch_l;

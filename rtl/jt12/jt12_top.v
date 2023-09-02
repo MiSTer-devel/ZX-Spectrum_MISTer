@@ -32,7 +32,9 @@ module jt12_top (
     input   [1:0]   addr,
     input           cs_n,
     input           wr_n,
-    
+
+    input           psg_type,
+
     output  [7:0]   dout,
     output          irq_n,
     // Separated output
@@ -247,6 +249,7 @@ generate
            .CE(clk_en_ssg),
            .RESET(rst),
 
+           .MODE(psg_type),
            .BDIR(write),
            .BC(~addr[0] | ~write),
            .DI(din),
