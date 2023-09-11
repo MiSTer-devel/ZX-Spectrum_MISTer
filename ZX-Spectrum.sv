@@ -761,7 +761,7 @@ turbosound turbosound
 	.DI(cpu_dout),
 	.DO(psg_dout),
 
-	.ENABLE(status[39]),
+	.ENABLE(~status[39]),
 	.PSG_MIX(status[40]),
 	.PSG_TYPE(status[41]),
 
