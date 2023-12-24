@@ -700,6 +700,7 @@ begin
 						end if;
 						if BTR_r = '1' then
 							PC <= PC - 2;
+							WZ <= std_logic_vector(PC)-"1";
 						end if;
 						if RstP = '1' then
 							WZ <= (others =>'0');
