@@ -183,10 +183,12 @@ architecture rtl of T80 is
 	signal XY_Ind               : std_logic;
 	signal No_BTR               : std_logic;
 	signal BTR_r                : std_logic;
+	signal BTR_r2               : std_logic;
 	signal Auto_Wait            : std_logic;
 	signal Auto_Wait_t1         : std_logic;
 	signal Auto_Wait_t2         : std_logic;
 	signal IncDecZ              : std_logic;
+	signal last_B               : std_logic_vector(7 downto 0);
 
 	-- ALU signals
 	signal BusB                 : std_logic_vector(7 downto 0);
@@ -385,6 +387,7 @@ begin
 
 	process (RESET_n, CLK_n)
 		variable n : std_logic_vector(7 downto 0);
+		variable pc_tmp : unsigned(15 downto 0);
 		variable ioq : std_logic_vector(8 downto 0);
 		variable temp_c : unsigned(8 downto 0);
 		variable temp_h : unsigned(4 downto 0);
@@ -417,6 +420,7 @@ begin
 			Read_To_Reg_r <= "00000";
 			Arith16_r <= '0';
 			BTR_r <= '0';
+			BTR_r2 <= '0';
 			Z16_r <= '0';
 			ALU_Op_r <= "0000";
 			Save_ALU_r <= '0';
@@ -537,6 +541,7 @@ begin
 
 					if T_Res = '1' then
 						BTR_r <= (I_BT or I_BC or I_BTR) and not No_BTR;
+						BTR_r2 <= I_BTR;
 						if Jump = '1' then
 							A(15 downto 8) <= DI_Reg;
 							A(7 downto 0) <= WZ(7 downto 0);
@@ -686,6 +691,7 @@ begin
 						F(Flag_H) <= ioq(8);
 						ioq := (ioq and "000000111") xor ('0'&BusA);
 						F(Flag_P) <= not (ioq(0) xor ioq(1) xor ioq(2) xor ioq(3) xor ioq(4) xor ioq(5) xor ioq(6) xor ioq(7));
+						last_B <= BusA;
 					end if;
 
 					if TState = 2 and Wait_n = '1' then
@@ -699,8 +705,24 @@ begin
 							PC <= PC + 1;
 						end if;
 						if BTR_r = '1' then
-							PC <= PC - 2;
+							pc_tmp := PC - 2;
+ 							PC <= pc_tmp;
 							WZ <= std_logic_vector(PC)-"1";
+							F(Flag_X) <= pc_tmp(11);
+							F(Flag_Y) <= pc_tmp(13);
+							if BTR_r2 = '1' then
+								n := last_B;
+								if F(Flag_C) = '1' then
+									if F(Flag_N) = '1' then
+										F(Flag_H) <= not (last_B(0) or last_B(1) or last_B(2) or last_B(3));
+										n:= n - "1";
+									else
+										F(Flag_H) <= last_B(0) and last_B(1) and last_B(2) and last_B(3);
+										n:= n + "1";
+									end if;
+								end if;
+								F(Flag_P) <= not (F(Flag_P) xor n(0) xor n(1) xor n(2));
+							end if;
 						end if;
 						if RstP = '1' then
 							WZ <= (others =>'0');
