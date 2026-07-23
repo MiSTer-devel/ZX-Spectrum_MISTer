@@ -77,6 +77,7 @@ always @(posedge CLK) begin
 	if(RESET) begin
 		ymreg     <= '{default:0};
 		ymreg[7]  <= '1;
+		ymreg[13] <= 8'h08; // Default envelope shape: continuous sawtooth (\\\\)
 		addr      <= '0;
 		env_reset <= 0;
 	end else begin
