@@ -293,12 +293,18 @@ always_ff @(posedge clk_sys) begin
 		sna128_state <= SNA128_IDLE;
 		if(snap_hw) begin
 			snap_REGSet <= 1;
-			snap_hwset <= 1;
 			hold <= '1;
+			// Only change machine type if memory architecture differs
+			// (preserve Pentagon timing when loading 128K snapshot on Pentagon)
+			if(snap_hw[4:2] == hw_ack[4:2]) begin
+				snap_reset <= 0; // Compatible - skip hw change, exit reset immediately
+			end else begin
+				snap_hwset <= 1; // Incompatible - request machine type change
+			end
 		end
 		else snap_reset <= 0; // unsupported snapshot loaded - just exit from reset.
 	end
-	
+
 	//wait for confirmation from HPS
 	if(snap_hwset && (snap_hw == hw_ack)) begin
 		snap_hwset <= 0;
