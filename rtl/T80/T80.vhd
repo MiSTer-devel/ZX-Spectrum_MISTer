@@ -190,6 +190,11 @@ architecture rtl of T80 is
 	signal IncDecZ              : std_logic;
 	signal last_B               : std_logic_vector(7 downto 0);
 
+	-- Q register for Zilog SCF/CCF undocumented flag behavior
+	-- Captures F[5,3] (YF,XF) after flag-modifying instructions
+	signal Q_reg                : std_logic_vector(7 downto 0);
+	signal F_last               : std_logic_vector(7 downto 0);
+
 	-- ALU signals
 	signal BusB                 : std_logic_vector(7 downto 0);
 	signal BusA                 : std_logic_vector(7 downto 0);
@@ -427,6 +432,8 @@ begin
 			PreserveC_r <= '0';
 			XY_Ind <= '0';
 			I_RXDD <= '0';
+			Q_reg <= (others => '0');
+			F_last <= (others => '1');
 
 		elsif rising_edge(CLK_n) then
 
@@ -666,20 +673,26 @@ begin
 								F(Flag_N) <= '1';
 							end if;
 							if I_CCF = '1' then
-								-- CCF
+								-- CCF: Zilog Z80 behavior
+								-- Undocumented YF/XF: (A | (F & ~Q)) & 0x28
 								F(Flag_C) <= not F(Flag_C);
-								F(Flag_Y) <= ACC(5);
+								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
 								F(Flag_H) <= F(Flag_C);
-								F(Flag_X) <= ACC(3);
+								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 								F(Flag_N) <= '0';
+								Q_reg(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
+								Q_reg(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 							end if;
 							if I_SCF = '1' then
-								-- SCF
+								-- SCF: Zilog Z80 behavior
+								-- Undocumented YF/XF: (A | (F & ~Q)) & 0x28
 								F(Flag_C) <= '1';
-								F(Flag_Y) <= ACC(5);
+								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
 								F(Flag_H) <= '0';
-								F(Flag_X) <= ACC(3);
+								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 								F(Flag_N) <= '0';
+								Q_reg(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
+								Q_reg(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 							end if;
 						end if;
 					end if;
@@ -921,6 +934,23 @@ begin
 					if XYbit_undoc='1' then
 						DO <= ALU_Q;
 					end if;
+				end if;
+
+				-- Q register update for Zilog SCF/CCF behavior
+				-- At end of instruction: if flags changed, Q = F & 0x28
+				-- If flags didn't change and not SCF/CCF, Q = 0
+				-- SCF/CCF update Q internally, so skip them here
+				if T_Res = '1' and Mode /= 3 then
+					if I_SCF = '0' and I_CCF = '0' then
+						if F /= F_last then
+							Q_reg(Flag_Y) <= F(Flag_Y);
+							Q_reg(Flag_X) <= F(Flag_X);
+						else
+							Q_reg(Flag_Y) <= '0';
+							Q_reg(Flag_X) <= '0';
+						end if;
+					end if;
+					F_last <= F;
 				end if;
 			end if;
 		end if;
