@@ -685,7 +685,13 @@ begin
 					end if;
 
 					if (TState = 2 and I_BTR = '1' and IR(0) = '1') or (TState = 1 and I_BTR = '1' and IR(0) = '0') then
-						ioq := ('0' & DI_Reg) + ('0' & std_logic_vector(ID16(7 downto 0)));
+						-- INI/IND (IR(0)=0): T = M + (C±1), WZ(7:0) has C±1 from MCycle 1
+						-- OUTI/OUTD (IR(0)=1): T = M + L, ID16(7:0) has L±1
+						if IR(0) = '0' then
+							ioq := ('0' & DI_Reg) + ('0' & WZ(7 downto 0));
+						else
+							ioq := ('0' & DI_Reg) + ('0' & std_logic_vector(ID16(7 downto 0)));
+						end if;
 						F(Flag_N) <= DI_Reg(7);
 						F(Flag_C) <= ioq(8);
 						F(Flag_H) <= ioq(8);
@@ -711,17 +717,20 @@ begin
 							F(Flag_X) <= pc_tmp(11);
 							F(Flag_Y) <= pc_tmp(13);
 							if BTR_r2 = '1' then
+								-- INIR/INDR/OTIR/OTDR repeat: adjust HF and PF
+								-- balu = B-1 if CF&NF, B+1 if CF&!NF, else B
 								n := last_B;
 								if F(Flag_C) = '1' then
 									if F(Flag_N) = '1' then
 										F(Flag_H) <= not (last_B(0) or last_B(1) or last_B(2) or last_B(3));
-										n:= n - "1";
+										n := last_B - "1";
 									else
 										F(Flag_H) <= last_B(0) and last_B(1) and last_B(2) and last_B(3);
-										n:= n + "1";
+										n := last_B + "1";
 									end if;
 								end if;
-								F(Flag_P) <= not (F(Flag_P) xor n(0) xor n(1) xor n(2));
+								-- PF: XOR with parity of (balu & 7)
+								F(Flag_P) <= F(Flag_P) xor (n(0) xor n(1) xor n(2));
 							end if;
 						end if;
 						if RstP = '1' then
