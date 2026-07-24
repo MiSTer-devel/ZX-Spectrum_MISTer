@@ -361,9 +361,10 @@ always_ff @(posedge clk_sys) begin
 				// Replay buffered third bank from BRAM to correct SDRAM page N.
 				// BRAM read data arrives one clock after the address (registered
 				// address in altsyncram), so each byte takes two cycles.
+				// Must also wait for ram_ready to avoid overrunning SDRAM.
 				if(!sna128_replay_phase) begin
 					sna128_replay_phase <= 1;
-				end else begin
+				end else if(ram_ready) begin
 					sna128_replay_phase <= 0;
 					addr_pre <= {4'b0000, sna128_page_n, sna128_replay_addr};
 					snap_data <= bram_rd_data;
