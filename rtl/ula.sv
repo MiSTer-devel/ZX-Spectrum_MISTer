@@ -197,9 +197,14 @@ always @(posedge clk_sys) begin
 				'hA,'hE: vaddr[14:7] <= {stdpage ? page_scr : tmx_cfg[0],1'b1,vc[7:6],vc[2:0],vc[5]}; // CAS and page(?) only
 			endcase
 
-			// Snow effect for ULA-48 only. ULA-128 has no snow bug.
-			if (mZX & ~m128 & ~nMREQ & ~nRFSH & contendAddr & snow_ena) case(hc_next[3:0])
-				'h8,'hC: vaddr[6:0] <= addr[6:0]; // only RAS got replaced
+			// Snow effect: ZX-48 ULA ignores RFSH, causing display corruption when
+			// I register is 0x40-0x7F. During Z80 refresh cycle, IR appears on address
+			// bus. ULA mistakes this for video RAM access and latches wrong row address.
+			// Reference: http://www.zxdesign.info/harlequinSnow.shtml
+			// Only affects ULA-48; ULA-128/Pentagon check RFSH and avoid the bug.
+			// Use latched MREQ/RFSH (sampled on CPUClk low) for correct timing alignment.
+			if (mZX & ~m128 & ~mreqt23 & ~rfsht23 & contendAddr & snow_ena) case(hc_next[3:0])
+				'h8,'hC: vaddr[6:0] <= addr[6:0]; // R register corrupts DRAM row address
 			endcase
 
 			case(hc_next[3:0])
@@ -245,6 +250,7 @@ assign     ulap_color = palette[(tmx_hi ? hiSRegister[15] : SRegister[7]) ? {Att
 reg  CPUClk;
 reg  ioreqtw3;
 reg  mreqt23;
+reg  rfsht23;
 
 wire ioreq_n      = (addr[0] & ~(ulap_acc & ulap_avail)) | nIORQ;
 wire clkwait_next = hc_next[2] | hc_next[3];
@@ -264,9 +270,10 @@ always @(posedge clk_sys) begin
 	if(ce_7mp) next_clk_r <= next_clk;
 
 	if(~CPUClk) begin
-		// These are transparent latches!
+		// Transparent latches - sample CPU signals during CPUClk low phase
 		ioreqtw3 <= ioreq_n;
 		mreqt23  <= nMREQ;
+		rfsht23  <= nRFSH;  // For snow effect timing
 	end
 end
 
