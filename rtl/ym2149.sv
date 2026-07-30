@@ -154,7 +154,11 @@ always @(posedge CLK) begin
 		if (ena_div_noise) begin
 			if (!ymreg[6][4:0] || (noise_gen_cnt >= ymreg[6][4:0] - 1'd1)) begin
 				noise_gen_cnt <= 0;
-				poly17 <= {(poly17[0] ^ poly17[2] ^ !poly17), poly17[16:1]};
+				// 17-bit LFSR, feedback bit0 XOR bit3 (die-verified AY-3-8910,
+				// x^17+x^3+1, maximal 131071-state sequence). The previous
+				// bit0^bit2 polynomial is non-primitive (cycles of 114681/
+				// 16383/7 states). !poly17 escapes the all-zero lockup state.
+				poly17 <= {(poly17[0] ^ poly17[3] ^ !poly17), poly17[16:1]};
 			end else begin
 				noise_gen_cnt <= noise_gen_cnt + 1'd1;
 			end
