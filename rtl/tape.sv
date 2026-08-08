@@ -71,6 +71,9 @@ tzxplayer #(.TZX_MS(CLOCK/1000)) tzxplayer
 	.stop(tzx_stop),
 	.stop48k(tzx_stop48k),
 	.restart_tape(~tape_ready || tape_mode != 2'b10),
+	.restart_block(tzx_restart_block),
+	.skip_block(tzx_skip_block),
+	.new_block(tzx_new_block),
 	.host_tap_in(din_r),
 	.cass_read(tzx_audio),
 	.cass_motor(!play_pause && tape_mode == 2'b10)
@@ -93,11 +96,14 @@ wire        tzx_loop_start;
 wire        tzx_loop_next;
 wire        tzx_stop;
 wire        tzx_stop48k;
+wire        tzx_new_block;
+reg         tzx_restart_block;
+reg         tzx_skip_block;
 
 always @(posedge clk_sys) begin
 	reg old_pause, old_prev, old_next, old_ready, old_rden;
 
-	reg [24:0] blk_list[32];
+	reg [24:0] blk_list[128];
 	reg [15:0] blocksz;
 	reg  [5:0] hdrsz;
 	reg [15:0] pilot;
@@ -112,7 +118,8 @@ always @(posedge clk_sys) begin
 	reg        skip;
 	reg        turboskip;
 	reg        auto_blk;
-	reg  [4:0] blk_num;
+	reg  [6:0] blk_num;
+	reg        blk_pending;
 	reg        old_stdload;
 	reg        old_read_done;
 	reg [24:0] tzx_loop_addr;
@@ -147,15 +154,19 @@ always @(posedge clk_sys) begin
 			hdrsz <= 32;
 			read_done <= 0;
 		end
+		if(tape_mode == 2'b10 && tape_size > 25'd10) begin
+			blk_list[1] <= tape_size - 25'd10;
+		end
 	end
 
 	// supply TZX data
 	old_read_done <= read_done;
+	tzx_restart_block <= 0;
 	if (tape_ready && tape_mode == 2'b10) begin
 		audio_out <= tzx_audio;
-		if(tzx_stop | (mode48k & tzx_stop48k)) play_pause <= 1;
-		if(tzx_loop_start) tzx_loop_addr <= addr;
-		if(tzx_loop_next) begin
+		if((tzx_stop | (mode48k & tzx_stop48k)) & ~tzx_restart_block) play_pause <= 1;
+		if(tzx_loop_start & ~tzx_restart_block) tzx_loop_addr <= addr;
+		if(tzx_loop_next & ~tzx_restart_block) begin
 			addr <= tzx_loop_addr;
 			read_cnt <= read_cnt + (addr - tzx_loop_addr);
 		end
@@ -165,6 +176,45 @@ always @(posedge clk_sys) begin
 			addr <= addr + 1'b1;
 		end else if (read_cnt && read_done && (tzx_req ^ tzx_ack)) begin
 			read_done <= 0;
+		end
+
+		if(tzx_new_block & ~tzx_restart_block) begin
+			blk_pending <= 0;
+			if(blk_num != 7'd127) begin
+				blk_num <= blk_num + 1'b1;
+				blk_list[blk_num + 1'b1] <= read_cnt + 1'b1;
+			end
+		end
+
+		old_prev <= prev;
+		if(prev & ~old_prev) begin
+			play_pause <= 0;
+			if(blk_pending & (blk_num >= 1)) begin
+				addr     <= size - blk_list[blk_num];
+				read_cnt <= blk_list[blk_num];
+				blk_num  <= blk_num - 1'b1;
+			end else if(~blk_pending & (blk_num >= 2)) begin
+				addr     <= size - blk_list[blk_num - 1'b1];
+				read_cnt <= blk_list[blk_num - 1'b1];
+				blk_num  <= blk_num - 2'd2;
+			end else begin
+				addr     <= size - blk_list[1];
+				read_cnt <= blk_list[1];
+				blk_num  <= 0;
+			end
+			blk_pending <= 1;
+			tzx_restart_block <= 1;
+			tzx_skip_block    <= 0;  // cancel any pending F3 skip on direction change
+			rd_req    <= 0;
+			read_done <= 0;
+		end
+
+		if(tzx_new_block) tzx_skip_block <= 0;
+
+		old_next <= next;
+		if(next & ~old_next) begin
+			play_pause     <= 0;
+			tzx_skip_block <= 1;
 		end
 	end
 
@@ -183,8 +233,10 @@ always @(posedge clk_sys) begin
 		auto_blk <= 0;
 		blk_list <= '{default:0};
 		blk_num  <= 0;
+		blk_pending <= 0;
 		rd_req   <= 0;
 		audio_out<= 1;
+		tzx_skip_block <= 0;
 	end else if(ce) begin
 
 		old_stdload <= stdload;

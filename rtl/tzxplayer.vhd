@@ -34,6 +34,9 @@ port(
 	clk             : in std_logic;
 	ce              : in std_logic;
 	restart_tape    : in std_logic;
+	restart_block   : in std_logic;                     -- pulse: jump to TZX_NEWBLOCK without re-reading the 10-byte header
+	skip_block      : in std_logic;                     -- level: fast-forward to the next navigation boundary
+	new_block       : out std_logic;                    -- one-cycle pulse when a navigable block/group starts
 
 	host_tap_in     : in std_logic_vector(7 downto 0);  -- 8bits fifo input
 	tzx_req         : buffer std_logic;                 -- request for new byte (edge trigger)
@@ -87,7 +90,8 @@ type tzx_state_t is (
 	TZX_PLAY_TAPBLOCK4,
 	TZX_DIRECT,
 	TZX_DIRECT2,
-	TZX_DIRECT3);
+	TZX_DIRECT3,
+	TZX_SKIP);
 
 signal tzx_state: tzx_state_t;
 
@@ -108,6 +112,7 @@ signal cass_motor_D   : std_logic;
 signal motor_counter  : std_logic_vector(21 downto 0);
 signal loop_iter      : std_logic_vector(15 downto 0);
 signal data_len_dword : std_logic_vector(31 downto 0);
+signal group_active   : std_logic;
 
 begin
 
@@ -127,6 +132,8 @@ begin
 		loop_start <= '0';
 		loop_next <= '0';
 		loop_iter <= (others => '0');
+		group_active <= '0';
+		new_block <= '0';
 
 	else
 
@@ -171,8 +178,9 @@ begin
 		loop_next  <= '0';
 		stop       <= '0';
 		stop48k    <= '0';
+		new_block  <= '0';
 
-		if playing = '1' and pulse_len = 0 and tzx_req = tzx_ack then
+		if playing = '1' and pulse_len = 0 and tzx_req = tzx_ack and restart_block = '0' then
 
 			tzx_req <= not tzx_ack; -- default request for new data
 
@@ -187,6 +195,13 @@ begin
 			when TZX_NEWBLOCK =>
 				tzx_offset <= (others=>'0');
 				ms_counter <= (others=>'0');
+				if group_active = '0' and (
+					tap_fifo_do = x"10" or tap_fifo_do = x"11" or
+					tap_fifo_do = x"12" or tap_fifo_do = x"13" or
+					tap_fifo_do = x"14" or tap_fifo_do = x"15"
+				) then
+					new_block <= '1';
+				end if;
 				case tap_fifo_do is
 					when x"10" => tzx_state <= TZX_NORMAL;
 					when x"11" => tzx_state <= TZX_TURBO;
@@ -197,8 +212,11 @@ begin
 					when x"18" => null; -- CSW recording (not implemented)
 					when x"19" => null; -- Generalized data block (not implemented)
 					when x"20" => tzx_state <= TZX_PAUSE;
-					when x"21" => tzx_state <= TZX_TEXT; -- Group start
-					when x"22" => null; -- Group end
+					when x"21" => -- Group start: index the composite block itself.
+						tzx_state <= TZX_TEXT;
+						if group_active = '0' then new_block <= '1'; end if;
+						group_active <= '1';
+					when x"22" => group_active <= '0'; -- Group end
 					when x"23" => null; -- Jump to block (not implemented)
 					when x"24" => tzx_state <= TZX_LOOP_START;
 					when x"25" => tzx_state <= TZX_LOOP_END;
@@ -215,6 +233,9 @@ begin
 					when x"5A" => tzx_state <= TZX_GLUE;
 					when others => null;
 				end case;
+				if loop_iter > 1 then
+					new_block <= '0';
+				end if;
 
 			when TZX_LOOP_START =>
 				tzx_offset <= tzx_offset + 1;
@@ -516,10 +537,78 @@ begin
 					tzx_state <= TZX_DIRECT2;
 				end if;
 
+			when TZX_SKIP =>
+				if data_len = 0 then
+					tzx_state <= TZX_NEWBLOCK;
+					tzx_req   <= tzx_ack;
+				else
+					data_len <= data_len - 1;
+				end if;
+
 			when others => null;
 			end case;
 
+			if skip_block = '1' and (
+				tzx_state = TZX_PLAY_TAPBLOCK2 or tzx_state = TZX_PLAY_TAPBLOCK4 or
+				tzx_state = TZX_DIRECT2
+			) then
+				pulse_len  <= (others => '0');
+				pause_len  <= (others => '0');
+				ms_counter <= (others => '0');
+				data_len   <= data_len - 1;
+				tzx_state  <= TZX_SKIP;
+				tzx_req    <= not tzx_ack;
+			elsif skip_block = '1' and (
+				tzx_state = TZX_PLAY_TONE   or tzx_state = TZX_PLAY_SYNC1 or
+				tzx_state = TZX_PLAY_SYNC2  or tzx_state = TZX_PLAY_TAPBLOCK or
+				tzx_state = TZX_PLAY_TAPBLOCK3 or tzx_state = TZX_DIRECT3
+			) then
+				pulse_len  <= (others => '0');
+				pause_len  <= (others => '0');
+				ms_counter <= (others => '0');
+				tzx_state  <= TZX_SKIP;
+				tzx_req    <= not tzx_ack;
+			elsif skip_block = '1' and tzx_state = TZX_PAUSE2 then
+				pulse_len  <= (others => '0');
+				pause_len  <= (others => '0');
+				ms_counter <= (others => '0');
+				tzx_state  <= TZX_NEWBLOCK;
+				tzx_req    <= tzx_ack;
+			elsif skip_block = '1' and tzx_state = TZX_TONE and tzx_offset >= x"03" then
+				pulse_len  <= (others => '0');
+				pause_len  <= (others => '0');
+				ms_counter <= (others => '0');
+				data_len   <= (others => '0');
+				tzx_state  <= TZX_SKIP;
+				tzx_req    <= not tzx_ack;
+			elsif skip_block = '1' and tzx_state = TZX_PULSES then
+				pulse_len  <= (others => '0');
+				pause_len  <= (others => '0');
+				ms_counter <= (others => '0');
+				if    tzx_offset = x"00" then
+					data_len <= "000000000000000" & tap_fifo_do & '0';
+				elsif tzx_offset = x"01" then
+					data_len <= ("000000000000000" & data_len(7 downto 0) & '0') - 1;
+				else
+					data_len <= ("000000000000000" & data_len(7 downto 0) & '0') - 2;
+				end if;
+				tzx_state  <= TZX_SKIP;
+				tzx_req    <= not tzx_ack;
+			end if;
+
 		end if; -- play tzx
+
+		-- F2 (prev) request: jump straight to TZX_NEWBLOCK without re-reading the 10-byte header
+		if restart_block = '1' then
+			tzx_offset <= (others => '0');
+			tzx_state  <= TZX_NEWBLOCK;
+			pulse_len  <= (others => '0');
+			pause_len  <= (others => '0');
+			ms_counter <= (others => '0');
+			loop_iter  <= (others => '0');
+			group_active <= '0';
+			tzx_req    <= not tzx_ack; -- request the block-ID byte at the new addr
+		end if;
 
 	end if;
   end if; -- clk
