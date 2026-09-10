@@ -1,7 +1,7 @@
 //
 //
 // Spectrum Video Controller implementation
-//   - ZX48, ZX128, Pentagon 128 timings
+//   - ZX48, ZX128, Pentagon 128, Scorpion ZS-256 timings
 //   - ULA+ v1.1 programmable palette with extended Timex control.
 //   - Timex video modes
 // 
@@ -65,6 +65,7 @@ module ULA
 	input         snow_ena,
 	input         mZX,
 	input         m128,
+	input         scorp_tim,
 	input         page_scr,
 	input   [2:0] page_ram,
 	input   [2:0] border_color,
@@ -254,7 +255,7 @@ reg  rfsht23;
 
 wire ioreq_n      = (addr[0] & ~(ulap_acc & ulap_avail)) | nIORQ;
 wire clkwait_next = hc_next[2] | hc_next[3];
-wire ulaContend   = clkwait_next & ~Border_next & CPUClk & ioreqtw3;
+wire ulaContend   = clkwait_next & ~Border_next & CPUClk & ioreqtw3 & ~scorp_tim;
 wire contendAddr  = ((addr[15:14] == 2'b01) | (m128 & (addr[15:14] == 2'b11) & page_ram[0]));
 wire memContend   = ioreq_n & mreqt23 & contendAddr;
 wire ioContend    = ~ioreq_n;

@@ -4,6 +4,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 
 ### Features:
 - Fully functional [ZX Spectrum 48K, 128K, +3](https://en.wikipedia.org/wiki/ZX_Spectrum) and [Pentagon 128](https://en.wikipedia.org/wiki/Pentagon_(computer)) with correct CPU and Video timings.
+- Scorpion ZS-256 (base model, Shadow Service Monitor via F11). Set Video Timings to Scorpion as well.
 - Pentagon 1024K and Profi 1024K memory interfaces.
 - Turbo 7MHz, 14MHz, 28MHz, 56MHz.
 - [ULA+ v1.1](https://sinclair.wiki.zxnet.co.uk/wiki/ULAplus) programmable palettes with extended Timex control.
@@ -111,6 +112,7 @@ Make sure boot1.rom and files inside VHD (or SD card) are from the same ESXDOS v
 - F10 - switch to Basic 48 (without 48K lock) and issue **LOAD""**
 - RShift+F10 - same as F10 with 48K lock
 - F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted) or DivMMC file browser.
+- F11 - in Scorpion ZS-256 mode: enter the Shadow Service Monitor (exit with the monitor's own exit routine).
 - RShift+F11 - enter Multiface 128 menu
 - F12 - OSD menu
 
@@ -147,3 +149,9 @@ boot.rom is a collection of required ROMs, however it does not contain a full se
 | 13 | 28000 | 2000 | 5d74d2e2e5a537639da92ff120f8a6d86f474495 | mf3-3.C.rom (CRC32: 2d594640) Multiface 3 (3.C) |
 | 14 | 2A000 | 2000 | N/A | zeroes.bin unused 8K, padding for the MF3 ROM to fill remaining space in 16K block |
 | 15 | 2C000 | 4000 | 5ea7c2b824672e914525d1d5c419d71b84a426a2 | 48.rom BASIC for 16/48K models |
+| 16 | 30000 | 4000 | 477114ff0fe1388e0979df1423602b21248164e5 | Scorpion ZS-256 v2.94 ROM 0 (Scorpion BASIC 128) |
+| 17 | 34000 | 4000 | 367b5a102fb663beee8e7930b8c4acc219c1f7b3 | Scorpion ZS-256 v2.94 ROM 1 (48K BASIC) |
+| 18 | 38000 | 4000 | 5ecf853611870802b07527cdb78cae553adc761d | Scorpion ZS-256 v2.94 ROM 2 (Shadow Service Monitor) |
+| 19 | 3C000 | 4000 | a95e48399622e5b7cfda6aa724c5b1c62d892c97 | Scorpion ZS-256 v2.94 ROM 3 (TR-DOS 5.03) |
+
+With the Scorpion ROMs added boot.rom is 256 KB (was 192 KB). SHA256: `a64828d45e2e73501916e1bee7beb30f028aa4ea181a9a60720bdeef28ec2b40`. To rebuild it from a 192 KB release ROM: `python3 tools/build_boot_rom.py --base <boot.rom> -o boot.rom` (Scorpion ROMs: `tools/scorp294.rom`).

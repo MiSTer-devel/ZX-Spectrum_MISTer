@@ -46,6 +46,7 @@ localparam ARCH_ZX3   = 5'b100_01; // ZX 128 +3
 localparam ARCH_P48   = 5'b011_10; // Pentagon 48
 localparam ARCH_P128  = 5'b000_10; // Pentagon 128
 localparam ARCH_P1024 = 5'b001_10; // Pentagon 1024
+localparam ARCH_SCORP = 5'b101_11; // Scorpion ZS-256
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
@@ -77,7 +78,7 @@ localparam CONF_STR = {
 	"h2d1P1O[29:28],Vertical Crop,No,270,216;",
 	"P1O[27:26],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"P1-;",
-	"P1O[21:20,General Sound,512KB,1MB,2MB,Disabled;",
+	"P1O[21:20],General Sound,512KB,1MB,2MB,Disabled;",
 	"P1O[3:2],Stereo Mix,none,25%,50%,100%;",
 	"P1-;",
 	"P1O[39],PSG/FM,Enabled,Disabled;",
@@ -91,8 +92,8 @@ localparam CONF_STR = {
 	"P2O[14],ULA+,Enabled,Disabled;",
 	"D3P2OP,Snow Bug,Disabled,Enabled;",
 	"P2-;",
-	"P2O[9:8],Video Timings,ULA-48,ULA-128,Pentagon;",
-	"P2O[12:10],Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3;",
+	"P2O[9:8],Video Timings,ULA-48,ULA-128,Pentagon,Scorpion;",
+	"P2O[12:10],Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3,Scorpion ZS-256;",
 	"P2-;",
 	"P2O[33:32],MMC Mode,Auto(VHD),SD Card 14MHz,SD Card 28MHz;",
 	"P2O[31:30],MMC Version,DivMMC+ESXDOS,DivMMC,ZXMMC;",
@@ -370,6 +371,8 @@ T80pa cpu
 wire [7:0] cpu_din =  
 		~nMREQ   ? (tape_dout_en ? tape_dout : ram_dout)      :
 		~io_rd   ? port_ff                                    :
+		// non-Turbo base model: #1FFD reads return #FF, #7FFD is write-only
+		(scorp & (addr[14:0] == 15'h1FFD)) ? 8'hFF            :
 		fdc_sel  ? fdc_dout                                   :
 		mf3_port ? (&addr[14:13] ? page_reg : page_reg_plus3) :
 		mmc_sel  ? mmc_dout                                   :
@@ -379,6 +382,8 @@ wire [7:0] cpu_din =
 		psg_rd   ? psg_dout                                   :
 		ulap_sel ? ulap_dout                                  :
 		~addr[0] ? {1'b1, ula_tape_in, 1'b1, kbd_dout}        :
+		(scorp & (addr[7:0] == 8'hFF)) ? port_ff               :
+		scorp    ? 8'hFF                                      :
 					  port_ff;
 
 reg init_reset = 1;
@@ -389,13 +394,13 @@ always @(posedge clk_sys) begin
 end
 
 reg NMI;
+reg old_F11;
+wire mni_pulse = ~old_F11 & Fn[11] & (mod[2:1] == 0); // F11 rising edge, mod 0/1 -> MNI
 always @(posedge clk_sys) begin
-	reg old_F11;
-
 	old_F11 <= Fn[11];
 
 	if(reset | ~Fn[11] | (m1 & (addr == 'h66))) NMI <= 0;
-	else if(~old_F11 & Fn[11] & (mod[2:1] == 0)) NMI <= 1;
+	else if(mni_pulse) NMI <= 1;
 end
 
 
@@ -419,10 +424,11 @@ always_comb begin
 		'b01XX_X_XX: ram_addr = load_addr;
 		'b001X_X_XX: ram_addr = tape_addr;
 		'b0001_X_XX: ram_addr = { 4'b1000, mmc_ram_bank,                                     addr[12:0]};
-		'b0000_0_00: ram_addr = { 3'b101,  page_rom,                                         addr[13:0]}; //ROM
-		'b0000_0_01: ram_addr = { 4'b0000, 3'd5,                                             addr[13:0]}; //Non-special page modes
-		'b0000_0_10: ram_addr = { 4'b0000, 3'd2,                                             addr[13:0]};
-		'b0000_0_11: ram_addr = { 1'b0,    page_ram,                                         addr[13:0]};
+		'b0000_0_00: ram_addr = scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, addr[13:0] } : { 3'b110, page_rom, addr[13:0] })
+		                              : { 3'b101, page_rom, addr[13:0] }; //ROM (scorp: RAM bank 0 / Scorpion ROM window)
+		'b0000_0_01: ram_addr = scorp ? { 1'b0, 4'd5, addr[13:0] } : { 4'b0000, 3'd5, addr[13:0] }; // #4000: bank 5 fixed (screen)
+		'b0000_0_10: ram_addr = scorp ? { 1'b0, 4'd2, addr[13:0] } : { 4'b0000, 3'd2, addr[13:0] }; // #8000: bank 2 fixed
+		'b0000_0_11: ram_addr = { 1'b0, (scorp ? {1'b0, scorp_page} : page_ram), addr[13:0]};          // #C000: paged bank
 		'b0000_1_00: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b00, addr[13:0]}; //Special page modes
 		'b0000_1_01: ram_addr = { 4'b0000, |page_reg_plus3[2:1], &page_reg_plus3[2:1], 1'b1, addr[13:0]};
 		'b0000_1_10: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b10, addr[13:0]};
@@ -446,7 +452,7 @@ always_comb begin
 		'b1XX: ram_we = snap_wr;
 		'b01X: ram_we = ioctl_wr;
 		'b001: ram_we = 0;
-		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | ((plusd_mem | mf128_mem) & addr[13])) & ~nMREQ & ~nWR;
+		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | (~scorp & (plusd_mem | mf128_mem) & addr[13]) | (scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
 	endcase
 end
 
@@ -480,12 +486,15 @@ reg        zx48;
 reg        p1024;
 reg        pf1024;
 reg        plus3;
+reg        scorp;
 reg        page_scr_copy;
+reg  [7:0] scorp_1ffd;
+reg        mni_pending = 0;
 reg        shadow_rom;
 reg  [7:0] page_reg;
 reg  [7:0] page_reg_plus3;
 reg  [7:0] page_reg_p1024;
-wire       page_disable = zx48 | (~p1024 & page_reg[5]) | (p1024 & page_reg_p1024[2] & page_reg[5]);
+wire       page_disable = zx48 | (~p1024 & ~scorp & page_reg[5]) | (p1024 & page_reg_p1024[2] & page_reg[5]);
 wire       page_scr     = page_reg[3];
 wire [5:0] page_ram     = {page_128k, page_reg[2:0]};
 wire       page_write   = ~addr[15] & ~addr[1] & (addr[14] | ~plus3) & ~page_disable; //7ffd
@@ -493,21 +502,32 @@ wire       page_write_plus3 = ~addr[1] & addr[12] & ~addr[13] & ~addr[14] & ~add
 wire       page_special = page_reg_plus3[0];
 wire       motor_plus3 = page_reg_plus3[3];
 wire       page_p1024 = addr[15] & addr[14] & addr[13] & ~addr[12] & ~addr[3]; //eff7
+wire [3:0] scorp_page    = {scorp_1ffd[4], page_reg[2:0]};
+wire       scorp_1ffd_wr = scorp & ~addr[15] & ~addr[1] & addr[12] & ~addr[13] & ~addr[14]; // #1FFD
+wire       scorp_cur_rom = scorp_1ffd[1] | page_reg[4];
+wire       scorp_rom1    = ~scorp_1ffd[0] & scorp_cur_rom; // ROM1 or ROM2 at #0000
+wire       scorp_lock    = scorp & page_reg[5];
 reg  [2:0] page_128k;
 
 reg  [3:0] page_rom;
 wire       active_48_rom = zx48 | (page_reg[4] & ~plus3) | (plus3 & page_reg[4] & page_reg_plus3[2] & ~page_special);
 
 always_comb begin
-	casex({mmc_rom_en, shadow_rom, trdos_en, plusd_mem, mf128_mem, plus3})
-		'b1XXXXX: page_rom <=   4'b0011; //esxdos
-		'b01XXXX: page_rom <=   4'b0100; //shadow
-		'b001XXX: page_rom <=   4'b0101; //trdos
-		'b0001XX: page_rom <=   4'b1100; //plusd
-		'b00001X: page_rom <= { 2'b11, plus3, ~plus3 }; //MF128/+3
-		'b000001: page_rom <= { 2'b10, page_reg_plus3[2], page_reg[4] }; //+3
-		'b000000: page_rom <= { zx48, 2'b11, zx48 | page_reg[4] }; //up to +2
-	endcase
+	if(scorp) begin
+		if(scorp_1ffd[1]) page_rom <= 4'd2;                        // ROM2 Shadow Service Monitor
+		else if(trdos_en) page_rom <= 4'd3;                        // TR-DOS ROMCS
+		else              page_rom <= {3'b000, page_reg[4]};       // 0=BASIC128 1=48K
+	end else begin
+		casex({mmc_rom_en, shadow_rom, trdos_en, plusd_mem, mf128_mem, plus3})
+			'b1XXXXX: page_rom <=   4'b0011; //esxdos
+			'b01XXXX: page_rom <=   4'b0100; //shadow
+			'b001XXX: page_rom <=   4'b0101; //trdos
+			'b0001XX: page_rom <=   4'b1100; //plusd
+			'b00001X: page_rom <= { 2'b11, plus3, ~plus3 }; //MF128/+3
+			'b000001: page_rom <= { 2'b10, page_reg_plus3[2], page_reg[4] }; //+3
+			'b000000: page_rom <= { zx48, 2'b11, zx48 | page_reg[4] }; //up to +2
+		endcase
+	end
 end
 
 always @(posedge clk_sys) begin
@@ -526,10 +546,13 @@ always @(posedge clk_sys) begin
 		page_reg_plus3 <= 0; 
 		page_reg_p1024 <= 0;
 		page_128k   <= 0;
+		scorp_1ffd  <= 0;
+		mni_pending <= 0;
+		scorp       <= (status[12:10] == 5);
 		page_reg[4] <= Fn[10];
 		page_reg_plus3[2] <= Fn[10];
 		shadow_rom <= shdw_reset & ~plusd_en;
-		if(Fn[10] && (rmod == 1)) begin
+		if(Fn[10] && (rmod == 1) && (status[12:10] != 5)) begin
 			p1024  <= 0;
 			pf1024 <= 0;
 			zx48   <= ~plus3;
@@ -541,15 +564,18 @@ always @(posedge clk_sys) begin
 		end
 	end else begin
 		if(snap_REGSet) begin
-			if((snap_hw == ARCH_ZX128) || (snap_hw == ARCH_P128) || (snap_hw == ARCH_ZX3)) page_reg <= snap_7ffd;
+			if((snap_hw == ARCH_ZX128) || (snap_hw == ARCH_P128) || (snap_hw == ARCH_ZX3) || (snap_hw == ARCH_SCORP)) page_reg <= snap_7ffd;
 			if(snap_hw == ARCH_ZX3) page_reg_plus3 <= snap_1ffd;
+			if(snap_hw == ARCH_SCORP) scorp_1ffd <= snap_1ffd;
 		end
 		else begin
 			if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
 			if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3) shadow_rom <= 1; 
 
 			if(io_wr & ~old_wr) begin
-				if(page_write) begin
+				if(scorp_1ffd_wr) begin
+					scorp_1ffd <= cpu_dout;
+				end else if(page_write & ~scorp_lock) begin
 					page_reg  <= cpu_dout;
 					if(p1024 & ~page_reg_p1024[2]) page_128k[2:0] <= { cpu_dout[5], cpu_dout[7:6] };
 					if(~plusd_mem) page_scr_copy <= cpu_dout[3];
@@ -560,12 +586,17 @@ always @(posedge clk_sys) begin
 				if(p1024 & page_p1024) page_reg_p1024 <= cpu_dout;
 			end
 		end
+		if(mni_pending) begin
+			scorp_1ffd <= {scorp_1ffd[7:2], 1'b1, scorp_1ffd[0]};
+			mni_pending <= 0;
+		end
+		if(mni_pulse & scorp) mni_pending <= 1;
 	end
 end
 
 
 ////////////////////  ULA PORT  ///////////////////
-reg [2:0] border_color;
+reg [2:0] border_color = 3'b000;   // Scorpion reads this before write
 reg       ear_out;
 reg       mic_out;
 
@@ -749,12 +780,16 @@ wire  [7:0] port_ff;
 wire        ulap_sel;
 wire  [7:0] ulap_dout;
 
+reg scorp_tim;
+always @(posedge clk_sys) scorp_tim <= (status[9:8] == 3);
+
 reg mZX, m128;
 always @(posedge clk_sys) begin
 	case(status[9:8])
-		      0: {mZX, m128} <= 2'b10;
-		      1: {mZX, m128} <= 2'b11;
-		default: {mZX, m128} <= 2'b00;
+		      0: {mZX, m128} <= 2'b10; // ULA-48
+		      1: {mZX, m128} <= 2'b11; // ULA-128
+		      3: {mZX, m128} <= 2'b10; // Scorpion - ULA-48 raster
+		default: {mZX, m128} <= 2'b00; // Pentagon
 	endcase
 end
 
@@ -767,7 +802,7 @@ wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
 
-ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]));
+ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]), .tmx_avail(tmx_avail & ~scorp));
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg ce_sys1;
@@ -877,7 +912,8 @@ mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .do
 
 // Joystick #1F and mouse #xxDF differ only in A7/A6, so each needs a full
 // low-byte compare; a six-bit one matches both
-wire       kemp_sel  = (addr[7:0] == 8'h1F);
+wire       beta_port = &addr[4:0] & (~addr[7] | &addr[7:5]); // #1F #3F #5F #7F #FF
+wire       kemp_sel  = (addr[7:0] == 8'h1F) & ~(scorp & beta_port & scorp_1ffd[1]);
 wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
 reg  [7:0] kemp_dout;
 always @(posedge clk_sys) kemp_dout <= mouse_sel ? mouse_data : {2'b00, joyk};
@@ -940,7 +976,7 @@ always @(posedge clk_sys) begin
 	
 	if(reset) begin
 		vsd_sel  <= (vhd_en && !status[33:32]);
-		mmc_mode <= (vhd_en || status[33:32]) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00;
+		mmc_mode <= ((vhd_en || status[33:32]) && (status[12:10] != 5)) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00; //no DivMMC on Scorpion
 	end
 end
 
@@ -1037,7 +1073,7 @@ reg         fdd_side;
 reg         fdd_reset;
 wire        fdd_intrq;
 wire        fdd_drq;
-wire        fdd_sel  = trdos_en & addr[2] & addr[1];
+wire        fdd_sel  = trdos_en & addr[2] & addr[1] & (~scorp | addr[0]);
 reg         fdd_ro;
 wire  [7:0] wdc_dout = (addr[7] & ~plusd_en) ? {fdd_intrq, fdd_drq, 6'h3F} : wd_dout;
 
@@ -1098,10 +1134,13 @@ always @(posedge clk_sys) begin
 		plusd_mem <= 0;
 		if(~old_wr & io_wr & fdd_sel & addr[7]) {fdd_side, fdd_reset, fdd_drive1} <= {~cpu_dout[4], ~cpu_dout[2], !cpu_dout[1:0]};
 		if(m1 && ~old_m1) begin
-			if(addr[15:14]) trdos_en <= 0;
-				else if((addr[13:8] == 'h3D) & active_48_rom & ~&mmc_mode) trdos_en <= 1;
+			// Keep the reduction OR: `addr[15:14] & <1 bit>` zero-extends and tests
+			// addr[14] alone, which stops TR-DOS paging out in #8000-#BFFF.
+			if((|addr[15:14]) & (~scorp | scorp_cur_rom)) trdos_en <= 0;
+				else if((addr[13:8] == 'h3D) & (scorp ? scorp_rom1 : active_48_rom) & ~&mmc_mode) trdos_en <= 1;
 				//else if(~mod[0] & (addr == 'h66)) trdos_en <= 1;
 		end
+		if(mni_pending & scorp) trdos_en <= 1;
 	end
 end
 
@@ -1289,7 +1328,7 @@ wire   [2:0] snap_border;
 wire   [7:0] snap_1ffd;
 wire   [7:0] snap_7ffd;
 
-snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128) snap_loader
+snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128, ARCH_SCORP) snap_loader
 (
 	.clk_sys(clk_sys),
 
