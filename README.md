@@ -76,9 +76,8 @@ Due to SDRAM speed limitation 28MHz and 56MHz speeds include wait states, so eff
 - **Profi 1024K** uses bits 0-2 in port DFFD to access additional memory.
 
 ### Mouse and Joystick:
-Kempston mouse has no strict convention which bit (D0 or D1) reflects a main button. After each reset, the first button pressed on mouse (left or right buttons only) will be represented by bit D0 (other button will be represented by bit D1). So, if you are not satisfied by mouse button map, then simply press reset and then press other button first.
-Due to port conflict with Kempston joystick, core uses autodetection. Any mouse activity will switch port to mouse control. Any joystick activity will switch port to joystick control.
-Some games/apps autodetect the mouse. So, move the mouse or click its button before use such games/apps.
+Kempston mouse (#FADF, #FBDF, #FFDF) and Kempston joystick (#1F) both answer with A5 low, and the only thing that separates them is A6/A7. The core decodes the whole low byte for each - #xxDF for the mouse, #xx1F for the joystick - so nothing is claimed by both and the two can be used at the same time. Earlier versions shared one six-bit decode and switched between them on activity, which made the joystick read as every direction plus fire held down whenever the mouse was in use.
+Kempston mouse has no strict convention which bit (D0 or D1) reflects the main button, so the OSD **Mouse** option picks: *Kempston L/R* puts the left button on D0, *Kempston R/L* the right one. Set it to *Disabled* and the mouse ports read as unattached.
 
 ### Snapshots:
 Core supports snapshot functionality of +D. In order to use it, you need to mount IMG or MGT image. ROM includes preloaded G+DOS image, thus you can mount IMG/MGT at any time (even while playing the game). **Note #1**: preloaded G+DOS has been patched to allow disk change on-the-fly. So, if you will load G+DOS from disk, then be careful - it may corrupt previous saves if you will change the disk! **Note #2:** only one disk image can be mounted at any time. Thus make sure if you use game from TRD image, the game won't save anything later to its disk. 

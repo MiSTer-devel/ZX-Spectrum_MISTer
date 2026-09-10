@@ -61,9 +61,10 @@ always @(posedge clk_sys) begin
 	old_status <= ps2_mouse[24];
 
 	if(reset) begin
-		dx     <= 128; // dx != dy for better mouse detection
-		dy     <= 0;
-		button <= 0;
+		dx      <= 128; // dx != dy for better mouse detection
+		dy      <= 0;
+		button  <= 0;
+		mbutton <= 0;  // was left out, so a cold reset kept a held middle button
 	end else begin
 		if(old_status != ps2_mouse[24]) begin
 			{mbutton,button} <= ps2_mouse[2:0];

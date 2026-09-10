@@ -370,7 +370,7 @@ wire [7:0] cpu_din =
 		fdc_sel  ? fdc_dout                                   :
 		mf3_port ? (&addr[14:13] ? page_reg : page_reg_plus3) :
 		mmc_sel  ? mmc_dout                                   :
-		kemp_sel ? kemp_dout                                  :
+		(kemp_sel | mouse_sel) ? kemp_dout                    :
 		portBF   ? {page_scr_copy, 7'b1111111}                :
 		gs_sel   ? gs_dout                                    :
 		psg_rd   ? psg_dout                                   :
@@ -868,22 +868,24 @@ wire recreated_zx = status[37];
 wire ghosting     = status[36];
 keyboard kbd( .* );
 
+wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
-mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(), .dout(mouse_data), .btn_swap(status[35]));
+mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]));
 
-wire       kemp_sel = addr[5:0] == 6'h1F;
+// Kempston joystick (#1F) and Kempston mouse (#FADF/#FBDF/#FFDF, low byte #DF)
+// both have A5=0 and are told apart by A7/A6, but the decode here was only six
+// bits wide, so one mux arm served both and kemp_mode had to arbitrate: with
+// the mouse enabled #1F fell through to the mouse module's `default` arm and
+// read #FF, which for an active-high Kempston is every direction plus fire held
+// down; with the joystick in use the mouse ports read the joystick. Fuse
+// separates them in the decode instead (kempston_strict_decoding
+// { 0x00e0, 0x0000 } - A7=A6=A5=0 - is its default for every machine), so each
+// gets a full low-byte compare and the mouse takes its register select from the
+// `sel` output the module already computed.
+wire       kemp_sel  = (addr[7:0] == 8'h1F);
+wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
 reg  [7:0] kemp_dout;
-reg        kemp_mode = 0;
-always @(posedge clk_sys) begin
-	reg old_status = 0;
-
-	if(reset || joyk || !status[35:34]) kemp_mode <= 0;
-
-	old_status <= ps2_mouse[24];
-	if(old_status != ps2_mouse[24] && status[35:34]) kemp_mode <= 1;
-
-	kemp_dout <= kemp_mode ? mouse_data : {2'b00, joyk};
-end
+always @(posedge clk_sys) kemp_dout <= mouse_sel ? mouse_data : {2'b00, joyk};
 
 wire [2:0] jsel  = status[19:17];
 
