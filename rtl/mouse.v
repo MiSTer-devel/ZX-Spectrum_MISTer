@@ -25,8 +25,9 @@ module mouse
 	input        reset,
 
 	input [24:0] ps2_mouse,
-	input [15:0] ps2_mouse_ext,   // 7:0 = signed wheel delta for this packet
+	input [15:0] ps2_mouse_ext,   // 7:0 = signed wheel delta
 	input        btn_swap,
+	input        wheel_inv,
 	
 	input  [2:0] addr,
 	output       sel,
@@ -66,17 +67,12 @@ always @(posedge clk_sys) begin
 		dx      <= 128; // dx != dy for better mouse detection
 		dy      <= 0;
 		button  <= 0;
-		mbutton <= 0;  // was left out, so a cold reset kept a held middle button
+		mbutton <= 0;
 		wheel   <= 0;
 	end else begin
 		if(old_status != ps2_mouse[24]) begin
 			{mbutton,button} <= ps2_mouse[2:0];
-			// MiSTer reads mice as raw HID reports, where a positive wheel byte is
-			// a scroll *up* - the opposite of the PS/2 Z convention. The Kempston
-			// counter runs the other way (Velesoft's tester reads 0 -> 15 for one
-			// step up), so subtract. 4-bit wrap makes the low nibble exact for any
-			// delta size: (w - d) mod 16 == (w - (d mod 16)) mod 16.
-			wheel <= wheel - ps2_mouse_ext[3:0];
+			wheel <= wheel_inv ? wheel - ps2_mouse_ext[3:0] : wheel + ps2_mouse_ext[3:0];
 			dx <= |newdx[11:8] ? {8{~ps2_mouse[4]}} : newdx;
 			dy <= |newdy[11:8] ? {8{~ps2_mouse[5]}} : newdy;
 		end

@@ -101,6 +101,7 @@ localparam CONF_STR = {
 	"O[37:36],Keyboard,Normal,Ghosting,Recreated ZX,Recr+Ghosting;",
 	"O[19:17],Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"O[35:34],Mouse,Disabled,Kempston L/R,Kempston R/L;",
+	"O[49],Mouse Wheel,Normal,Inverted;",
 	"O[6],Fast Tape Load,On,Off;",
 	"O[1],Tape Sound,On,Off;",
 	"O[24:22],CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
@@ -872,18 +873,10 @@ keyboard kbd( .* );
 
 wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
-mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]));
+mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]), .wheel_inv(status[49]));
 
-// Kempston joystick (#1F) and Kempston mouse (#FADF/#FBDF/#FFDF, low byte #DF)
-// both have A5=0 and are told apart by A7/A6, but the decode here was only six
-// bits wide, so one mux arm served both and kemp_mode had to arbitrate: with
-// the mouse enabled #1F fell through to the mouse module's `default` arm and
-// read #FF, which for an active-high Kempston is every direction plus fire held
-// down; with the joystick in use the mouse ports read the joystick. Fuse
-// separates them in the decode instead (kempston_strict_decoding
-// { 0x00e0, 0x0000 } - A7=A6=A5=0 - is its default for every machine), so each
-// gets a full low-byte compare and the mouse takes its register select from the
-// `sel` output the module already computed.
+// Joystick #1F and mouse #xxDF differ only in A7/A6, so each needs a full
+// low-byte compare; a six-bit one matches both
 wire       kemp_sel  = (addr[7:0] == 8'h1F);
 wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
 reg  [7:0] kemp_dout;
