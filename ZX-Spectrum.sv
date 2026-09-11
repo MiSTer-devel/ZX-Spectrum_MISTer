@@ -221,6 +221,7 @@ end
 //////////////////   HPS I/O   ///////////////////
 wire [10:0] ps2_key;
 wire [24:0] ps2_mouse;
+wire [15:0] ps2_mouse_ext;
 
 wire [15:0] joy0;
 wire [15:0] joy1;
@@ -271,6 +272,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
+	.ps2_mouse_ext(ps2_mouse_ext),
 
 	.joystick_0(joy0),
 	.joystick_1(joy1),

@@ -25,6 +25,7 @@ module mouse
 	input        reset,
 
 	input [24:0] ps2_mouse,
+	input [15:0] ps2_mouse_ext,   // 7:0 = signed wheel delta for this packet
 	input        btn_swap,
 	
 	input  [2:0] addr,
@@ -37,6 +38,7 @@ assign sel  = port_sel;
 
 reg   [1:0] button;
 reg         mbutton;
+reg   [3:0] wheel;
 reg  [11:0] dx;
 reg  [11:0] dy;
 
@@ -50,7 +52,7 @@ always @* begin
 	casex(addr)
 		 3'b011: data = dx[7:0];
 		 3'b111: data = dy[7:0];
-		 3'bX10: data = ~{5'b00000,mbutton, button[~btn_swap], button[btn_swap]} ;
+		 3'bX10: data = {wheel, 1'b1, ~mbutton, ~button[~btn_swap], ~button[btn_swap]};
 		default: {port_sel,data} = 8'hFF;
 	endcase
 end
@@ -65,9 +67,16 @@ always @(posedge clk_sys) begin
 		dy      <= 0;
 		button  <= 0;
 		mbutton <= 0;  // was left out, so a cold reset kept a held middle button
+		wheel   <= 0;
 	end else begin
 		if(old_status != ps2_mouse[24]) begin
 			{mbutton,button} <= ps2_mouse[2:0];
+			// MiSTer reads mice as raw HID reports, where a positive wheel byte is
+			// a scroll *up* - the opposite of the PS/2 Z convention. The Kempston
+			// counter runs the other way (Velesoft's tester reads 0 -> 15 for one
+			// step up), so subtract. 4-bit wrap makes the low nibble exact for any
+			// delta size: (w - d) mod 16 == (w - (d mod 16)) mod 16.
+			wheel <= wheel - ps2_mouse_ext[3:0];
 			dx <= |newdx[11:8] ? {8{~ps2_mouse[4]}} : newdx;
 			dy <= |newdy[11:8] ? {8{~ps2_mouse[5]}} : newdy;
 		end
