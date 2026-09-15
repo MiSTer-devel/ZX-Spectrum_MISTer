@@ -101,6 +101,7 @@ localparam CONF_STR = {
 	"O[37:36],Keyboard,Normal,Ghosting,Recreated ZX,Recr+Ghosting;",
 	"O[19:17],Joystick,Kempston,Sinclair I,Sinclair II,Sinclair I+II,Cursor;",
 	"O[35:34],Mouse,Disabled,Kempston L/R,Kempston R/L;",
+	"O[49],Mouse Wheel,Normal,Inverted;",
 	"O[6],Fast Tape Load,On,Off;",
 	"O[1],Tape Sound,On,Off;",
 	"O[24:22],CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
@@ -221,6 +222,7 @@ end
 //////////////////   HPS I/O   ///////////////////
 wire [10:0] ps2_key;
 wire [24:0] ps2_mouse;
+wire [15:0] ps2_mouse_ext;
 
 wire [15:0] joy0;
 wire [15:0] joy1;
@@ -271,6 +273,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),
+	.ps2_mouse_ext(ps2_mouse_ext),
 
 	.joystick_0(joy0),
 	.joystick_1(joy1),
@@ -370,7 +373,7 @@ wire [7:0] cpu_din =
 		fdc_sel  ? fdc_dout                                   :
 		mf3_port ? (&addr[14:13] ? page_reg : page_reg_plus3) :
 		mmc_sel  ? mmc_dout                                   :
-		kemp_sel ? kemp_dout                                  :
+		(kemp_sel | mouse_sel) ? kemp_dout                    :
 		portBF   ? {page_scr_copy, 7'b1111111}                :
 		gs_sel   ? gs_dout                                    :
 		psg_rd   ? psg_dout                                   :
@@ -868,22 +871,16 @@ wire recreated_zx = status[37];
 wire ghosting     = status[36];
 keyboard kbd( .* );
 
+wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
-mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(), .dout(mouse_data), .btn_swap(status[35]));
+mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]), .wheel_inv(status[49]));
 
-wire       kemp_sel = addr[5:0] == 6'h1F;
+// Joystick #1F and mouse #xxDF differ only in A7/A6, so each needs a full
+// low-byte compare; a six-bit one matches both
+wire       kemp_sel  = (addr[7:0] == 8'h1F);
+wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
 reg  [7:0] kemp_dout;
-reg        kemp_mode = 0;
-always @(posedge clk_sys) begin
-	reg old_status = 0;
-
-	if(reset || joyk || !status[35:34]) kemp_mode <= 0;
-
-	old_status <= ps2_mouse[24];
-	if(old_status != ps2_mouse[24] && status[35:34]) kemp_mode <= 1;
-
-	kemp_dout <= kemp_mode ? mouse_data : {2'b00, joyk};
-end
+always @(posedge clk_sys) kemp_dout <= mouse_sel ? mouse_data : {2'b00, joyk};
 
 wire [2:0] jsel  = status[19:17];
 

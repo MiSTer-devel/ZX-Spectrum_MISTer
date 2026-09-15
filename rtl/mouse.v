@@ -25,7 +25,9 @@ module mouse
 	input        reset,
 
 	input [24:0] ps2_mouse,
+	input [15:0] ps2_mouse_ext,   // 7:0 = signed wheel delta
 	input        btn_swap,
+	input        wheel_inv,
 	
 	input  [2:0] addr,
 	output       sel,
@@ -37,6 +39,7 @@ assign sel  = port_sel;
 
 reg   [1:0] button;
 reg         mbutton;
+reg   [3:0] wheel;
 reg  [11:0] dx;
 reg  [11:0] dy;
 
@@ -50,7 +53,7 @@ always @* begin
 	casex(addr)
 		 3'b011: data = dx[7:0];
 		 3'b111: data = dy[7:0];
-		 3'bX10: data = ~{5'b00000,mbutton, button[~btn_swap], button[btn_swap]} ;
+		 3'bX10: data = {wheel, 1'b1, ~mbutton, ~button[~btn_swap], ~button[btn_swap]};
 		default: {port_sel,data} = 8'hFF;
 	endcase
 end
@@ -61,12 +64,15 @@ always @(posedge clk_sys) begin
 	old_status <= ps2_mouse[24];
 
 	if(reset) begin
-		dx     <= 128; // dx != dy for better mouse detection
-		dy     <= 0;
-		button <= 0;
+		dx      <= 128; // dx != dy for better mouse detection
+		dy      <= 0;
+		button  <= 0;
+		mbutton <= 0;
+		wheel   <= 0;
 	end else begin
 		if(old_status != ps2_mouse[24]) begin
 			{mbutton,button} <= ps2_mouse[2:0];
+			wheel <= wheel_inv ? wheel - ps2_mouse_ext[3:0] : wheel + ps2_mouse_ext[3:0];
 			dx <= |newdx[11:8] ? {8{~ps2_mouse[4]}} : newdx;
 			dy <= |newdy[11:8] ? {8{~ps2_mouse[5]}} : newdy;
 		end

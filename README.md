@@ -76,9 +76,9 @@ Due to SDRAM speed limitation 28MHz and 56MHz speeds include wait states, so eff
 - **Profi 1024K** uses bits 0-2 in port DFFD to access additional memory.
 
 ### Mouse and Joystick:
-Kempston mouse has no strict convention which bit (D0 or D1) reflects a main button. After each reset, the first button pressed on mouse (left or right buttons only) will be represented by bit D0 (other button will be represented by bit D1). So, if you are not satisfied by mouse button map, then simply press reset and then press other button first.
-Due to port conflict with Kempston joystick, core uses autodetection. Any mouse activity will switch port to mouse control. Any joystick activity will switch port to joystick control.
-Some games/apps autodetect the mouse. So, move the mouse or click its button before use such games/apps.
+Kempston mouse has no strict convention which bit (D0 or D1) reflects a main button. Pick the mapping with the OSD Mouse option.
+The mouse and the Kempston joystick decoded separately (#xxDF for the mouse, #xx1F for the joystick) and both can be used at the same time.
+Scroll wheel is supported. Bits D4-D7 of #FADF hold a 4-bit wheel counter. OSD Mouse Wheel option can invert the direction.
 
 ### Snapshots:
 Core supports snapshot functionality of +D. In order to use it, you need to mount IMG or MGT image. ROM includes preloaded G+DOS image, thus you can mount IMG/MGT at any time (even while playing the game). **Note #1**: preloaded G+DOS has been patched to allow disk change on-the-fly. So, if you will load G+DOS from disk, then be careful - it may corrupt previous saves if you will change the disk! **Note #2:** only one disk image can be mounted at any time. Thus make sure if you use game from TRD image, the game won't save anything later to its disk. 
