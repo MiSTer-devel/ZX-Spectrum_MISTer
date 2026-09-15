@@ -17,7 +17,7 @@
 //  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //============================================================================
 
-module snap_loader #(parameter ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128)
+module snap_loader #(parameter ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128, ARCH_SCORP)
 (
 	input          clk_sys,
 
@@ -474,6 +474,7 @@ always_ff @(posedge clk_sys) begin
 						4,5,6,12: snap_hw <= ARCH_ZX128; //128K
 						  7,8,13: snap_hw <= ARCH_ZX3;   //+3
 								 9: snap_hw <= ARCH_P128;  //P128
+								10: snap_hw <= ARCH_SCORP; //Scorpion (ZS-256)
 					 endcase
 				35: snap_7ffd <= ioctl_data;
 				//37: snap_mhw  <= ioctl_data[7];
@@ -546,7 +547,8 @@ always_ff @(posedge clk_sys) begin
 								5: begin addr <= {4'd0, 14'd0}; wren <= 1; end
 								8: begin addr <= {4'd5, 14'd0}; wren <= 1; end
 							endcase
-						else if(ioctl_data>=3 && ioctl_data<=10) begin
+						//Scorpion saves its banks as pages 3-18; 4-bit page-3 math wraps 16-18 -> 13-15.
+						else if(ioctl_data>=3 && ioctl_data<=(snap_hw == ARCH_SCORP ? 8'd18 : 8'd10)) begin
 							addr <= {ioctl_data[3:0]-3'd3, 14'd0};
 							wren <= 1;
 						end
