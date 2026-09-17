@@ -62,7 +62,7 @@ localparam CONF_PLUS3 = "(+3) ";
 localparam CONF_STR = {
 	"Spectrum;;",
 	"S0,TRDIMGDSKMGT,Load Disk;",
-	"F2,TAPCSWTZX,Load Tape;",
+	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
 	"S1,VHD,Load DivMMC;",
 	"-;",

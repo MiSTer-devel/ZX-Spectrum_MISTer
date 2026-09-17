@@ -45,7 +45,7 @@ module tape
 	output reg    available,
 
 	input         tape_ready,
-	input   [1:0] tape_mode, //0 - TAP, 1 - CSW, 2 - TZX
+	input   [1:0] tape_mode, //0 - TAP, 1 - CSW, 2 - TZX, 3 - PZX
 	input  [24:0] tape_size,
 	input         stdload,
 	input         req_hdr,
@@ -79,6 +79,23 @@ tzxplayer #(.TZX_MS(CLOCK/1000)) tzxplayer
 	.cass_motor(!play_pause && tape_mode == 2'b10)
 );
 
+pzxplayer #(.PZX_MS(CLOCK/1000)) pzxplayer
+(
+	.clk(clk_sys),
+	.ce(ce),
+	.pzx_req(pzx_req),
+	.pzx_ack(tzx_ack),
+	.stop(pzx_stop),
+	.stop48k(pzx_stop48k),
+	.restart_tape(~tape_ready || tape_mode != 2'b11),
+	.restart_block(tzx_restart_block),
+	.skip_block(tzx_skip_block),
+	.new_block(pzx_new_block),
+	.host_tap_in(din_r),
+	.cass_read(pzx_audio),
+	.cass_motor(!play_pause && tape_mode == 2'b11)
+);
+
 assign rd   = rd_req & rd_en;
 assign dout = data;
 
@@ -99,6 +116,17 @@ wire        tzx_stop48k;
 wire        tzx_new_block;
 reg         tzx_restart_block;
 reg         tzx_skip_block;
+wire        pzx_audio;
+wire        pzx_req;
+wire        pzx_stop;
+wire        pzx_stop48k;
+wire        pzx_new_block;
+
+wire        plr_audio     = tape_mode[0] ? pzx_audio     : tzx_audio;
+wire        plr_req       = tape_mode[0] ? pzx_req       : tzx_req;
+wire        plr_stop      = tape_mode[0] ? pzx_stop      : tzx_stop;
+wire        plr_stop48k   = tape_mode[0] ? pzx_stop48k   : tzx_stop48k;
+wire        plr_new_block = tape_mode[0] ? pzx_new_block : tzx_new_block;
 
 always @(posedge clk_sys) begin
 	reg old_pause, old_prev, old_next, old_ready, old_rden;
@@ -157,32 +185,35 @@ always @(posedge clk_sys) begin
 		if(tape_mode == 2'b10 && tape_size > 25'd10) begin
 			blk_list[1] <= tape_size - 25'd10;
 		end
+		if(tape_mode == 2'b11) begin
+			blk_list[1] <= tape_size;
+		end
 	end
 
-	// supply TZX data
+	// supply TZX/PZX data
 	old_read_done <= read_done;
 	tzx_restart_block <= 0;
-	if (tape_ready && tape_mode == 2'b10) begin
-		audio_out <= tzx_audio;
-		if((tzx_stop | (mode48k & tzx_stop48k)) & ~tzx_restart_block) play_pause <= 1;
+	if (tape_ready && tape_mode[1]) begin
+		audio_out <= plr_audio;
+		if((plr_stop | (mode48k & plr_stop48k)) & ~tzx_restart_block) play_pause <= 1;
 		if(tzx_loop_start & ~tzx_restart_block) tzx_loop_addr <= addr;
 		if(tzx_loop_next & ~tzx_restart_block) begin
 			addr <= tzx_loop_addr;
 			read_cnt <= read_cnt + (addr - tzx_loop_addr);
 		end
 		if(~old_read_done & read_done) begin
-			tzx_ack <= tzx_req;
+			tzx_ack <= plr_req;
 			read_cnt <= read_cnt - 1'd1;
 			addr <= addr + 1'b1;
-		end else if (read_cnt && read_done && (tzx_req ^ tzx_ack)) begin
+		end else if (read_cnt && read_done && (plr_req ^ tzx_ack)) begin
 			read_done <= 0;
 		end
 
-		if(tzx_new_block & ~tzx_restart_block) begin
+		if(plr_new_block & ~tzx_restart_block) begin
 			blk_pending <= 0;
 			if(blk_num != 7'd127) begin
 				blk_num <= blk_num + 1'b1;
-				blk_list[blk_num + 1'b1] <= read_cnt + 1'b1;
+				blk_list[blk_num + 1'b1] <= read_cnt + (tape_mode[0] ? 25'd8 : 25'd1);
 			end
 		end
 
@@ -209,7 +240,7 @@ always @(posedge clk_sys) begin
 			read_done <= 0;
 		end
 
-		if(tzx_new_block) tzx_skip_block <= 0;
+		if(plr_new_block) tzx_skip_block <= 0;
 
 		old_next <= next;
 		if(next & ~old_next) begin
@@ -478,7 +509,7 @@ module smart_tape
 	input   [7:0] buff_din,
 
 	input         ioctl_download,
-	input   [1:0] tape_mode, // 0 - TAP, 1 - CSW, 2 - TZX
+	input   [1:0] tape_mode, // 0 - TAP, 1 - CSW, 2 - TZX, 3 - PZX
 	input  [24:0] tape_size,
 	input         req_hdr,
 
