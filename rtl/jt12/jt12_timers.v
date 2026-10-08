@@ -42,9 +42,16 @@ module jt12_timers(
   output 	 	irq_n
 );
 
+parameter num_ch=6;
+
+// Timer A counts once per sample, timer B once per 16 samples. A sample is
+// 24 clk_en with 6 channels but only 12 with 3 (YM2203)
+localparam mult_max_A = num_ch==6 ?  24 :  11;
+localparam mult_max_B = num_ch==6 ? 384 : 191;
+
 assign irq_n = ~( (flag_A&enable_irq_A) | (flag_B&enable_irq_B) );
 
-jt12_timer #(.mult_width(5), .mult_max(24), .counter_width(10)) 
+jt12_timer #(.mult_width(5), .mult_max(mult_max_A), .counter_width(10)) 
 timer_A(
 	.clk		( clk		), 
 	.rst		( rst		),
@@ -56,7 +63,7 @@ timer_A(
 	.overflow	( overflow_A)
 );
 
-jt12_timer #(.mult_width(9), .mult_max(384), .counter_width(8)) 
+jt12_timer #(.mult_width(9), .mult_max(mult_max_B), .counter_width(8)) 
 timer_B(
 	.clk		( clk		), 
 	.rst		( rst		),

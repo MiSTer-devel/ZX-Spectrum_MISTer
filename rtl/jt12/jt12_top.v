@@ -200,7 +200,7 @@ jt12_mmr #(.use_ssg(use_ssg),.num_ch(num_ch),.use_pcm(use_pcm))
     .psg_wr_n   ( psg_wr_n  )    
 );
 
-jt12_timers u_timers( 
+jt12_timers #(.num_ch(num_ch)) u_timers( 
     .clk        ( clk           ),
     .clk_en     ( clk_en | fast_timers  ),
     .rst        ( rst           ),
