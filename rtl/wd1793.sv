@@ -741,7 +741,9 @@ always @(posedge clk_sys) begin
 					end
 
 				A_TRACK:  if (!s_busy) wdreg_track <= din;
-				A_SECTOR: if (!s_busy) {ra_sector, wdreg_sector} <= {din,din};
+				// Real chip latches the sector register even while busy. Type I commands don't use it,
+				// so allow writes then (some loaders set it before the SEEK has completed).
+				A_SECTOR: if (!s_busy | !cmd_mode) {ra_sector, wdreg_sector} <= {din,din};
 				A_DATA:   wdreg_data <= din;
 			endcase
 		end
