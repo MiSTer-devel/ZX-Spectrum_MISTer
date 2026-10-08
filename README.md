@@ -24,6 +24,7 @@ Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/m
 - [General Sound](https://8bit.yarek.pl/interface/zx.generalsound/index.html) with 512KB-2MB of RAM
 - [Turbosound-FM](http://speccy.info/TurboSound_FM) (dual YM2203 incl. dual YM2149)
 - SAA1099
+- Covox (8-bit DAC) on port #FB, #DD (Scorpion) or #5F/#3F stereo (Profi), disabled by default
 
 ### Installation:
 Copy the *.rbf to the root folder, copy boot.rom to games/Spectrum/ on the SD card.

@@ -79,6 +79,7 @@ localparam CONF_STR = {
 	"P1O[27:26],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"P1-;",
 	"P1O[21:20],General Sound,512KB,1MB,2MB,Disabled;",
+	"P1O[43:42],Covox,Disabled,#FB,#DD (Scorpion),#5F/#3F (Profi);",
 	"P1O[3:2],Stereo Mix,none,25%,50%,100%;",
 	"P1-;",
 	"P1O[39],PSG/FM,Enabled,Disabled;",
@@ -743,6 +744,26 @@ ddram ddram
 
 wire gs_sel = (addr[7:0] ==? 'b1011?011) & ~&status[21:20];
 
+// Covox: write-only 8-bit DAC
+// #FB         - mono (Pentagon/classic)
+// #DD         - mono (Scorpion)
+// #5F/#3F     - left/right (Profi), outside of TR-DOS where these are WD1793 ports
+reg [7:0] covox_l = 8'h80, covox_r = 8'h80;
+always @(posedge clk_sys) begin
+	if(reset) {covox_l, covox_r} <= 16'h8080;
+	else if(io_wr) begin
+		case(status[43:42])
+			1: if(addr[7:0] == 8'hFB) {covox_l, covox_r} <= {cpu_dout, cpu_dout};
+			2: if(addr[7:0] == 8'hDD) {covox_l, covox_r} <= {cpu_dout, cpu_dout};
+			3: if(~trdos_en) begin
+					if(addr[7:0] == 8'h5F) covox_l <= cpu_dout;
+					if(addr[7:0] == 8'h3F) covox_r <= cpu_dout;
+				end
+			0: ;
+		endcase
+	end
+end
+
 localparam [3:0] comp_f = 4;
 localparam [3:0] comp_a = 2;
 localparam       comp_x = ((32767 * (comp_f - 1)) / ((comp_f * comp_a) - 1)) + 1; // +1 to make sure it won't overflow
@@ -765,8 +786,11 @@ endfunction
 reg [15:0] audio_l, audio_r;
 always @(posedge clk_aud) begin
 	reg signed [18:0] pre_l, pre_r;
-	pre_l <= {ts_l[17], ts_l} + {{6{gs_l[14]}}, gs_l[13:1]} + {5'b00000, saa_l, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
-	pre_r <= {ts_r[17], ts_r} + {{6{gs_r[14]}}, gs_r[13:1]} + {5'b00000, saa_r, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
+	reg  [7:0] cov_l, cov_r;
+	cov_l <= covox_l ^ 8'h80; // unsigned -> signed, #80 is silence
+	cov_r <= covox_r ^ 8'h80;
+	pre_l <= {ts_l[17], ts_l} + {{6{gs_l[14]}}, gs_l[13:1]} + {5'b00000, saa_l, 6'd0} + {{5{cov_l[7]}}, cov_l, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
+	pre_r <= {ts_r[17], ts_r} + {{6{gs_r[14]}}, gs_r[13:1]} + {5'b00000, saa_r, 6'd0} + {{5{cov_r[7]}}, cov_r, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
 
 	audio_l <= compr(sat16(pre_l));
 	audio_r <= compr(sat16(pre_r));
