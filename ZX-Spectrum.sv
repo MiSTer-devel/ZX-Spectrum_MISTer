@@ -895,12 +895,21 @@ video_mixer #(.LINE_LENGTH(896), .GAMMA(1)) video_mixer
 
 assign VGA_SL = {scale==3, scale==2};
 
-reg new_vmode = 0;
+reg vmode_tgl = 0;
 always @(posedge clk_sys) begin
 	reg [1:0] vmode;
 	
 	vmode<=status[9:8];
-	if(vmode != status[9:8]) new_vmode <= ~new_vmode;
+	if(vmode != status[9:8]) vmode_tgl <= ~vmode_tgl;
+end
+
+// hps_io's video_calc samples new_vmode on CLK_VIDEO without a synchronizer
+reg new_vmode = 0;
+always @(posedge CLK_VIDEO) begin
+	reg vmode_tgl_s = 0;
+
+	vmode_tgl_s <= vmode_tgl;
+	new_vmode <= vmode_tgl_s;
 end
 
 ////////////////////   HID   ////////////////////
