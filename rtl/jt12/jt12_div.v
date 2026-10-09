@@ -40,12 +40,18 @@ always @(*)
         opn_pres = 4'd5;
         ssg_pres = 3'd3; // unused, really
     end
-    else
-    casez( div_setting )
-        2'b0?: { opn_pres, ssg_pres } = { 4'd2-4'd1, 3'd0 }; // 2
-        2'b10: { opn_pres, ssg_pres } = { 4'd6-4'd1, 3'd3 }; // 6 - Default for YM2608
-        2'b11: { opn_pres, ssg_pres } = { 4'd3-4'd1, 3'd1 }; // 3 - Default for YM2203
-    endcase // div_setting
+    else begin
+        // YM2203: one cen per master clock, 12 slots per sample
+        casez( div_setting )
+            2'b0?: opn_pres = 4'd2-4'd1; // 2
+            2'b10: opn_pres = 4'd6-4'd1; // 6 - Default for YM2203
+            2'b11: opn_pres = 4'd3-4'd1; // 3
+        endcase // div_setting
+        // The YM2149 behind clk_en_ssg is an AY clocked at master/2, which is
+        // the YM2203 SSG pitch at the default /6. Its x2/x4 for the /3 and /2
+        // prescalers is not modelled: no known software stays on them
+        ssg_pres = 3'd1;
+    end
 
 
 always @(negedge clk) begin

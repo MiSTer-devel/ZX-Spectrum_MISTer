@@ -181,7 +181,7 @@ reg part;
 always @(posedge clk) begin : memory_mapped_registers
     if( rst ) begin
         selected_register   <= 8'h0;
-        div_setting         <= 2'b11; 
+        div_setting         <= 2'b10; // /6
         up_ch               <= 3'd0;
         up_op               <= 2'd0;
         up_keyon            <= 1'd0;
@@ -215,6 +215,13 @@ always @(posedge clk) begin : memory_mapped_registers
             if( !addr[0] ) begin
                 selected_register <= din;  
                 part <= addr[1];             
+                // clock divider: selected by the address write alone
+                case( din )
+                    REG_CLK_N6: div_setting <= 2'b10;
+                    REG_CLK_N3: if( div_setting==2'b10 ) div_setting <= 2'b11;
+                    REG_CLK_N2: div_setting <= 2'b00;
+                    default:;
+                endcase
             end else begin
                 // Global registers
                 din_copy <= din;
@@ -242,10 +249,6 @@ always @(posedge clk) begin : memory_mapped_registers
                     `ifndef NOLFO                   
                     REG_LFO:    { lfo_en, lfo_freq } <= din[3:0];
                     `endif
-                    // clock divider
-                    REG_CLK_N6: div_setting[1] <= 1'b1; 
-                    REG_CLK_N3: div_setting[0] <= 1'b1; 
-                    REG_CLK_N2: div_setting <= 2'b0;
                     // CH3 special registers
                     8'hA9: { block_ch3op1, fnum_ch3op1 } <= { latch_fnum, din };
                     8'hA8: { block_ch3op3, fnum_ch3op3 } <= { latch_fnum, din };
