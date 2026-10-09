@@ -7,12 +7,18 @@ set clk_56m {*|pll|pll_inst|altera_pll_i|*[1].*|divclk}
 set_multicycle_path -from [get_clocks $clk_56m] -to [get_clocks $clk_sys] -setup 2
 set_multicycle_path -from [get_clocks $clk_56m] -to [get_clocks $clk_sys] -hold 1
 
-# Effective clock is only half of the system clock, so allow 2 clock cycles for the paths in the T80 cpu
-set_multicycle_path -from {emu|cpu|*} -setup 2
-set_multicycle_path -from {emu|cpu|*} -hold 1
+# Effective clock is only half of the system clock, so allow 2 clock cycles for the paths in the T80 cpu.
+# The bus strobes are excluded: they feed single-cycle edge detectors (io_wr & ~old_wr, we & ~old_we)
+set cpu_strobes [get_keepers {emu|cpu|IORQ_n emu|cpu|MREQ_n emu|cpu|RD_n emu|cpu|WR_n emu|cpu|u0|M1_n* emu|cpu|u0|RFSH_n*}]
+set_multicycle_path -from [remove_from_collection [get_keepers {emu|cpu|*}] $cpu_strobes] -setup 2
+set_multicycle_path -from [remove_from_collection [get_keepers {emu|cpu|*}] $cpu_strobes] -hold 1
 
 set_multicycle_path -to   {emu|cpu|*} -setup 2
 set_multicycle_path -to   {emu|cpu|*} -hold 1
+
+# CPU clock enables are single-cycle pulses, so they must reach the T80 within one clock
+set_multicycle_path -from {emu|ce_7mn* emu|ce_cpu_t* emu|cpu_en*} -to {emu|cpu|*} -setup 1
+set_multicycle_path -from {emu|ce_7mn* emu|ce_cpu_t* emu|cpu_en*} -to {emu|cpu|*} -hold 0
 
 # The CE is only active in every 2 clocks, so allow 2 clock cycles
 set_multicycle_path -from {emu|tape|*} -setup 2
