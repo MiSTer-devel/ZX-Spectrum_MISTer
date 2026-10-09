@@ -614,7 +614,7 @@ end
 
 ////////////////////   AUDIO   ///////////////////
 wire  [7:0] psg_dout;
-wire [11:0] ts_l, ts_r;
+wire signed [17:0] ts_l, ts_r;
 wire        psg_sel = /*addr[0] &*/ addr[15] & ~addr[1];
 wire        psg_we  = psg_sel & ~nIORQ & ~nWR & nM1;
 wire        psg_rd  = psg_sel & addr[14];
@@ -753,18 +753,23 @@ function [15:0] compr; input [15:0] inp;
 	begin
 		v  = inp[15] ? (~inp) + 1'd1 : inp;
 		v2 = (v < comp_x[15:0]) ? (v * comp_a) : (((v - comp_x[15:0])/comp_f) + comp_b[15:0]);
+		if(v2 > 16'd32767) v2 = 16'd32767;
 		compr = inp[15] ? ~(v2-1'd1) : v2;
 	end
 endfunction
 
+function [15:0] sat16; input signed [18:0] inp;
+	sat16 = (inp > 19'sd32767) ? 16'h7FFF : (inp < -19'sd32768) ? 16'h8000 : inp[15:0];
+endfunction
+
 reg [15:0] audio_l, audio_r;
 always @(posedge clk_aud) begin
-	reg [15:0] pre_l, pre_r;
-	pre_l <= {ts_l,4'd0} + {{3{gs_l[14]}}, gs_l[13:1]} + {2'b00, saa_l, 6'd0} + {3'b000, ear_out, mic_out, tape_aud, 10'd0};
-	pre_r <= {ts_r,4'd0} + {{3{gs_r[14]}}, gs_r[13:1]} + {2'b00, saa_r, 6'd0} + {3'b000, ear_out, mic_out, tape_aud, 10'd0};
+	reg signed [18:0] pre_l, pre_r;
+	pre_l <= {ts_l[17], ts_l} + {{6{gs_l[14]}}, gs_l[13:1]} + {5'b00000, saa_l, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
+	pre_r <= {ts_r[17], ts_r} + {{6{gs_r[14]}}, gs_r[13:1]} + {5'b00000, saa_r, 6'd0} + {6'b000000, ear_out, mic_out, tape_aud, 10'd0};
 
-	audio_l <= compr(pre_l);
-	audio_r <= compr(pre_r);
+	audio_l <= compr(sat16(pre_l));
+	audio_r <= compr(sat16(pre_r));
 end
 
 assign AUDIO_L = audio_l;
