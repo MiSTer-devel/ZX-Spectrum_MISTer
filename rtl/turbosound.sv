@@ -35,8 +35,8 @@ module turbosound
 	input   [7:0] DI,	       // Data In
 	output  [7:0] DO,	       // Data Out
 
-	output [11:0] CHANNEL_L, // Output channel L
-	output [11:0] CHANNEL_R  // Output channel R
+	output signed [17:0] CHANNEL_L, // Output channel L
+	output signed [17:0] CHANNEL_R  // Output channel R
 );
 
 
@@ -156,27 +156,27 @@ jt03 ym2203_1
 
 assign DO = ay_select ? DO_1 : DO_0;
 
-reg  [8:0] sum_ch_a,sum_ch_b,sum_ch_c;
-reg  [7:0] psg_a,psg_b,psg_c;
-reg [11:0] psg_l,psg_r,opn_s;
-reg [11:0] ch_l, ch_r;
+reg         [8:0] psg_a,psg_b,psg_c;
+reg        [10:0] psg_l,psg_r;
+reg signed [16:0] opn_s;
+reg signed [17:0] ch_l, ch_r;
+
+// FM full scale = 4.75x one PSG channel, as measured on TSFM hardware
+wire signed [20:0] opn_0_g = $signed(opn_0) * 21'sd19;
+wire signed [20:0] opn_1_g = $signed(opn_1) * 21'sd19;
 
 always @(posedge CLK) begin
 
-	sum_ch_a <= { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };
-	sum_ch_b <= { 1'b0, psg_ch_b_1 } + { 1'b0, psg_ch_b_0 };
-	sum_ch_c <= { 1'b0, psg_ch_c_1 } + { 1'b0, psg_ch_c_0 };
+	psg_a <= { 1'b0, psg_ch_a_1 } + { 1'b0, psg_ch_a_0 };
+	psg_b <= { 1'b0, psg_ch_b_1 } + { 1'b0, psg_ch_b_0 };
+	psg_c <= { 1'b0, psg_ch_c_1 } + { 1'b0, psg_ch_c_0 };
 
-	psg_a <= sum_ch_a[8] ? 8'hFF : sum_ch_a[7:0];
-	psg_b <= sum_ch_b[8] ? 8'hFF : sum_ch_b[7:0];
-	psg_c <= sum_ch_c[8] ? 8'hFF : sum_ch_c[7:0];
+	psg_l <= {1'b0,                   psg_a, 1'd0} + {2'b00, PSG_MIX ? psg_c : psg_b};
+	psg_r <= {1'b0, PSG_MIX ? psg_b : psg_c, 1'd0} + {2'b00, PSG_MIX ? psg_c : psg_b};
+	opn_s <= (opn_0_g >>> 5) + (opn_1_g >>> 5);
 
-	psg_l <= {3'b000,                   psg_a, 1'd0} + {4'b0000, PSG_MIX ? psg_c : psg_b};
-	psg_r <= {3'b000, PSG_MIX ? psg_b : psg_c, 1'd0} + {4'b0000, PSG_MIX ? psg_c : psg_b};
-	opn_s <= {{2{opn_0[15]}}, opn_0[15:6]} + {{2{opn_1[15]}}, opn_1[15:6]};
-
-	ch_l <= ~ENABLE ? 12'd0 : fm_ena ? $signed(opn_s) + $signed(psg_l) : $signed(psg_l);
-	ch_r <= ~ENABLE ? 12'd0 : fm_ena ? $signed(opn_s) + $signed(psg_r) : $signed(psg_r);
+	ch_l <= ~ENABLE ? 18'sd0 : $signed({3'b000, psg_l, 4'd0}) + (fm_ena ? opn_s : 17'sd0);
+	ch_r <= ~ENABLE ? 18'sd0 : $signed({3'b000, psg_r, 4'd0}) + (fm_ena ? opn_s : 17'sd0);
 end
 
 assign CHANNEL_L = ch_l;
