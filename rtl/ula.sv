@@ -70,6 +70,7 @@ module ULA
 	input   [2:0] page_ram,
 	input   [2:0] border_color,
 	input   [1:0] wide,
+	input   [1:0] overscan, // Pentagon only: 0 - off, 1 - horizontal centered (352x304), 2 - full (384x304)
 
 	// Video outputs
 	output reg    HSync,
@@ -131,10 +132,24 @@ always @(posedge clk_sys) begin
 		end
 
 		if(!mZX) begin
-			if (hc_next == 312) HBlank <= 1;
-				else if (hc_next == 420) HBlank <= 0;
-			if (hc_next == 338) HSync <= 1;
-				else if (hc_next == 370) HSync <= 0;
+			case(overscan)
+				1: begin
+					if (hc_next == 316) HBlank <= 1;
+						else if (hc_next == 412) HBlank <= 0;
+				end
+				2: begin
+					if (hc_next == 348) HBlank <= 1;
+						else if (hc_next == 412) HBlank <= 0;
+				end
+				default: begin
+					if (hc_next == 312) HBlank <= 1;
+						else if (hc_next == 420) HBlank <= 0;
+				end
+			endcase
+			// Paper is output at hc 12..267; the overscan windows give it a 48 px left border.
+			// Full overscan extends the right border past the normal HSync start, so HSync moves along.
+			if (hc_next == (overscan == 2 ? 356 : 338)) HSync <= 1;
+				else if (hc_next == (overscan == 2 ? 388 : 370)) HSync <= 0;
 		end else if(m128) begin
 			if (hc_next == 312) HBlank <= 1;
 				else if (hc_next == 424) HBlank <= 0;
@@ -152,6 +167,12 @@ always @(posedge clk_sys) begin
 				else if (vc_next == 244) VSync <= 0;
 			if(vc_next == 236) VBlank <= 1;
 				else if(vc_next == 264) VBlank <= 0;
+		end else if(overscan) begin
+			// A scan-out line starts at hc 412 of the previous vc, so VBlank switches there to keep
+			// whole lines; VSync ends one line earlier, before the first visible line.
+			if(vc_next == 247) VSync <= 1;
+				else if (vc_next == 255) VSync <= 0;
+			if(hc_next == 412) VBlank <= (vc_next >= 239) && (vc_next < 255);
 		end else begin
 			if(vc_next == 248) VSync <= 1;
 				else if (vc_next == 256) VSync <= 0;
