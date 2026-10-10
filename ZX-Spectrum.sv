@@ -57,7 +57,7 @@ localparam CONF_PLUS3 = "(+3) ";
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXX     X
+//  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXX     X       XX
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -74,7 +74,7 @@ localparam CONF_STR = {
 	"P1O[16:15],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"P1-;",
 	"P1O[38],Narrow Border,No,Yes;",
-	"D4P1O[43:42],Pentagon Overscan,Off,Centered,Full;",
+	"D4P1O[58:57],Pentagon Overscan,Off,Centered,Full;",
 	"H2d1P1O[28],Vertical Crop,No,Yes;",
 	"h2d1P1O[29:28],Vertical Crop,No,270,216;",
 	"P1O[27:26],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
@@ -868,7 +868,7 @@ always @(posedge CLK_VIDEO) if (ce_pix) begin
 end
 
 reg [9:0] vcrop;
-wire [1:0] overscan = status[43:42];
+wire [1:0] overscan = status[58:57];
 reg [1:0] wide;
 always @(posedge CLK_VIDEO) begin
 	vcrop <= 0;
