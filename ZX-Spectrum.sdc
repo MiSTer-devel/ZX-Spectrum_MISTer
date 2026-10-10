@@ -80,3 +80,4 @@ set_false_path -from {emu|zx48}
 set_false_path -from {emu|p1024}
 set_false_path -from {emu|pf1024}
 set_false_path -from {emu|hps_io|status[*]}
+set_false_path -from {emu|vmode_tgl} -to {emu|*vmode_tgl_s}
