@@ -51,6 +51,9 @@ module YM2149
 	output [7:0] CHANNEL_A, // PSG Output channel A
 	output [7:0] CHANNEL_B, // PSG Output channel B
 	output [7:0] CHANNEL_C, // PSG Output channel C
+	output [4:0] LEVEL_A,   // 5-bit levels before the DAC, fixed volume as 2*vol+1
+	output [4:0] LEVEL_B,
+	output [4:0] LEVEL_C,
 
 	input        SEL,
 	input        MODE,
@@ -295,11 +298,20 @@ always @(posedge CLK) begin
 end
 
 reg [5:0] A,B,C;
+reg [4:0] lvl_a, lvl_b, lvl_c;
 always @(posedge CLK) begin
 	A <= {MODE, ~((ymreg[7][0] | tone_gen_op[1]) & (ymreg[7][3] | noise_gen_op[0])) ? 5'd0 : ymreg[8][4]  ? env_vol[4:0] : { ymreg[8][3:0],  ymreg[8][3]}};
 	B <= {MODE, ~((ymreg[7][1] | tone_gen_op[2]) & (ymreg[7][4] | noise_gen_op[1])) ? 5'd0 : ymreg[9][4]  ? env_vol[4:0] : { ymreg[9][3:0],  ymreg[9][3]}};
 	C <= {MODE, ~((ymreg[7][2] | tone_gen_op[3]) & (ymreg[7][5] | noise_gen_op[2])) ? 5'd0 : ymreg[10][4] ? env_vol[4:0] : {ymreg[10][3:0], ymreg[10][3]}};
+
+	lvl_a <= ~((ymreg[7][0] | tone_gen_op[1]) & (ymreg[7][3] | noise_gen_op[0])) ? 5'd0 : ymreg[8][4]  ? env_vol[4:0] : { ymreg[8][3:0], 1'b1};
+	lvl_b <= ~((ymreg[7][1] | tone_gen_op[2]) & (ymreg[7][4] | noise_gen_op[1])) ? 5'd0 : ymreg[9][4]  ? env_vol[4:0] : { ymreg[9][3:0], 1'b1};
+	lvl_c <= ~((ymreg[7][2] | tone_gen_op[3]) & (ymreg[7][5] | noise_gen_op[2])) ? 5'd0 : ymreg[10][4] ? env_vol[4:0] : {ymreg[10][3:0], 1'b1};
 end
+
+assign LEVEL_A = lvl_a;
+assign LEVEL_B = lvl_b;
+assign LEVEL_C = lvl_c;
 
 wire [7:0] volTable[64] = '{
 	//YM2149
