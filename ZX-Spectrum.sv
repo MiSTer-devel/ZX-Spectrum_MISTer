@@ -30,7 +30,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[3:2];
 
-assign LED_USER  = ioctl_download | tape_led | tape_adc_act | (sd_act & ~vsd_sel);
+assign LED_USER  = ioctl_download | tape_led | tape_adc_act | (sd_act & ~vsd_sel) | ss_active;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -66,6 +66,7 @@ localparam CONF_STR = {
 	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
 	"S1,VHD,Load DivMMC;",
+	"SC2,SAV,Savestate Disk;",
 	"-;",
 
 	"P1,Video;",
@@ -120,7 +121,7 @@ localparam CONF_STR = {
 	"O[24:22],CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
 	"-;",
 	"R[0],Reset & Apply;",
-	"J,Fire 1,Fire 2;",
+	"J,Fire 1,Fire 2,Savestates;",
 	"V,v",`BUILD_DATE
 };
 
@@ -169,9 +170,9 @@ always @(posedge clk_sys) begin
 
 	// split ce for relaxed fitting
 	ce_cpu_tp <= !(counter & turbo);
-	ce_tape   <= !(counter & turbo) & cpu_en;
-	ce_wd1793 <= !(counter & turbo) & cpu_en;
-	ce_u765   <= !(counter & turbo) & cpu_en;
+	ce_tape   <= !(counter & turbo) & cpu_en & ~ss_active;
+	ce_wd1793 <= !(counter & turbo) & cpu_en & ~ss_active;
+	ce_u765   <= !(counter & turbo) & cpu_en & ~ss_active;
 
 	ce_cpu_tn <= !((counter & turbo) ^ turbo ^ turbo[4:1]);
 
@@ -188,6 +189,7 @@ always_comb begin
 		 'b0100: turbo_req = 5'b00001;
 		default: turbo_req = 5'b11111;
 	endcase
+	if(ss_active) turbo_req = 5'b00011;
 end
 
 reg [2:0] speed_req;
@@ -220,12 +222,12 @@ always @(posedge clk_sys) begin
 			timeout <= 1;
 			turbo   <= turbo_req;
 		end else if(!cpu_en & !timeout & ram_ready) begin
-			cpu_en  <= ~pause;
+			cpu_en  <= (~pause | ss_freezing | ss_active) & ~ss_stopped;
 		end else if(!turbo[4:2] & !ram_ready) begin // SDRAM wait for 28MHz/56MHz turbo
 			cpu_en  <= 0;
 		end else if(!turbo[4:3] & !ram_ready & tape_active) begin // SDRAM wait for TAPE load on 14MHz
 			cpu_en  <= 0;
-		end else if(cpu_en & pause) begin
+		end else if(cpu_en & ((pause & ~ss_freezing & ~ss_active) | ss_stop_req)) begin
 			cpu_en  <= 0;
 		end
 	end
@@ -234,11 +236,14 @@ end
 
 //////////////////   HPS I/O   ///////////////////
 wire [10:0] ps2_key;
+wire [10:0] ss_ps2_key;
 wire [24:0] ps2_mouse;
 wire [15:0] ps2_mouse_ext;
 
-wire [15:0] joy0;
-wire [15:0] joy1;
+wire [15:0] joy0_hps;
+wire [15:0] joy1_hps;
+wire [15:0] joy0 = ss_joy_block ? 16'd0 : joy0_hps;
+wire [15:0] joy1 = ss_joy_block ? 16'd0 : joy1_hps;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [63:0] status;
@@ -258,15 +263,22 @@ wire        sd_wr_mmc;
 wire [31:0] sd_lba_mmc;
 wire [7:0]  sd_buff_din_mmc;
 
-wire [31:0] sd_lba[2] = '{plus3_fdd_ready ? sd_lba_plus3 : sd_lba_wd, sd_lba_mmc};
-wire  [1:0] sd_rd = {sd_rd_mmc, plus3_fdd_ready ? sd_rd_plus3 : sd_rd_wd};
-wire  [1:0] sd_wr = {sd_wr_mmc, plus3_fdd_ready ? sd_wr_plus3 : sd_wr_wd};
-wire  [1:0] sd_ack;
-wire  [8:0] sd_buff_addr;
+wire        sd_rd_ss;
+wire        sd_wr_ss;
+wire [31:0] sd_lba_ss;
+wire  [5:0] sd_blk_cnt_ss;
+wire  [7:0] sd_buff_din_ss;
+
+wire [31:0] sd_lba[3] = '{plus3_fdd_ready ? sd_lba_plus3 : sd_lba_wd, sd_lba_mmc, sd_lba_ss};
+wire  [5:0] sd_blk_cnt[3] = '{6'd0, 6'd0, sd_blk_cnt_ss};
+wire  [2:0] sd_rd = {sd_rd_ss, sd_rd_mmc, plus3_fdd_ready ? sd_rd_plus3 : sd_rd_wd};
+wire  [2:0] sd_wr = {sd_wr_ss, sd_wr_mmc, plus3_fdd_ready ? sd_wr_plus3 : sd_wr_wd};
+wire  [2:0] sd_ack;
+wire [13:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din[2] = '{plus3_fdd_ready ? sd_buff_din_plus3 : sd_buff_din_wd, sd_buff_din_mmc};
+wire  [7:0] sd_buff_din[3] = '{plus3_fdd_ready ? sd_buff_din_plus3 : sd_buff_din_wd, sd_buff_din_mmc, sd_buff_din_ss};
 wire        sd_buff_wr;
-wire  [1:0] img_mounted;
+wire  [2:0] img_mounted;
 wire [63:0] img_size;
 wire        img_readonly;
 
@@ -278,8 +290,10 @@ wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
 wire [21:0] gamma_bus;
+wire [64:0] RTC;
+wire [32:0] TIMESTAMP;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -288,8 +302,8 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 	.ps2_mouse(ps2_mouse),
 	.ps2_mouse_ext(ps2_mouse_ext),
 
-	.joystick_0(joy0),
-	.joystick_1(joy1),
+	.joystick_0(joy0_hps),
+	.joystick_1(joy1_hps),
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.new_vmode(new_vmode),
@@ -299,6 +313,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 	.status_in({status[63:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
+	.sd_blk_cnt(sd_blk_cnt),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
@@ -317,6 +332,9 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2)) hps_io
 	.ioctl_index(ioctl_index),
 	.ioctl_wait(ioctl_wait),
 	
+	.RTC(RTC),
+	.TIMESTAMP(TIMESTAMP),
+
 	.gamma_bus(gamma_bus)
 );
 
@@ -351,12 +369,13 @@ wire        io_rd = ~nIORQ & ~nRD & nM1;
 wire        m1    = ~nM1 & ~nMREQ;
 
 wire[211:0]	cpu_reg;  // IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+wire        nHALT;
 wire [15:0] reg_DE  = cpu_reg[111:96];
 wire  [7:0] reg_A   = cpu_reg[7:0];
 
 T80pa cpu
 (
-	.RESET_n(~reset),
+	.RESET_n(~(reset | ss_cpu_reset)),
 	.CLK(clk_sys),
 	.CEN_p(ce_cpu_p),
 	.CEN_n(ce_cpu_n),
@@ -370,17 +389,18 @@ T80pa cpu
 	.RD_n(nRD),
 	.WR_n(nWR),
 	.RFSH_n(nRFSH),
-	.HALT_n(1),
+	.HALT_n(nHALT),
 	.BUSAK_n(nBUSACK),
 	.A(addr),
 	.DO(cpu_dout),
 	.DI(cpu_din),
 	.REG(cpu_reg),
-	.DIR(snap_REG),
-	.DIRSet(snap_REGSet)
+	.DIR(ss_dir_set ? ss_dir : snap_REG),
+	.DIRSet(snap_REGSet | ss_dir_set)
 );
 
 wire [7:0] cpu_din =  
+		ss_dout_en ? ss_dout                                  :
 		~nMREQ   ? (tape_dout_en ? tape_dout : ram_dout)      :
 		~io_rd   ? port_ff                                    :
 		// non-Turbo base model: #1FFD reads return #FF, #7FFD is write-only
@@ -466,6 +486,11 @@ always_comb begin
 		'b001: ram_we = 0;
 		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | (~scorp & (plusd_mem | mf128_mem) & addr[13]) | (scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
 	endcase
+
+	if(ss_active) begin
+		ram_addr = {7'd0, addr[15] ? (addr[14] ? ss_bank : 4'd2) : 4'd5, addr[13:0]};
+		if(~addr[15] & ~addr[14]) ram_we = 0;
+	end
 end
 
 sdram ram
@@ -580,6 +605,12 @@ always @(posedge clk_sys) begin
 			if(snap_hw == ARCH_ZX3) page_reg_plus3 <= snap_1ffd;
 			if(snap_hw == ARCH_SCORP) scorp_1ffd <= snap_1ffd;
 		end
+		else if(ss_set_ports) begin
+			page_reg      <= ss_new_7ffd;
+			page_scr_copy <= ss_new_7ffd[3];
+			if(plus3) page_reg_plus3 <= ss_new_1ffd;
+			if(scorp) scorp_1ffd <= ss_new_1ffd;
+		end
 		else begin
 			if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
 			if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3) shadow_rom <= 1; 
@@ -621,6 +652,7 @@ always @(posedge clk_sys) begin
 	end
 	
 	if(snap_REGSet) border_color <= snap_border;
+	if(ss_set_ports) {ear_out, mic_out, border_color} <= {ss_new_ear, ss_new_mic, ss_new_border};
 end
 
 
@@ -640,7 +672,7 @@ always @(posedge clk_aud) begin
 	reg [3:0] counter = 0;
 	reg p1,p2,p3;
 	
-	p1 <= pause;
+	p1 <= pause | ss_active;
 	p2 <= p1;
 	p3 <= p2;
 
@@ -900,7 +932,8 @@ wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
 
-ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]), .tmx_avail(tmx_avail & ~scorp));
+ULA ULA(.*, .din(cpu_dout), .page_ram(page_ram[2:0]), .tmx_avail(tmx_avail & ~scorp),
+        .vram_dout(ss_ula_q), .border_color(ss_ula_border));
 
 wire ce_sys = ce_7mp | (mode512 & ce_7mn);
 reg ce_sys1;
@@ -928,7 +961,7 @@ always @(posedge CLK_VIDEO) if (ce_pix) begin
 	hbl <= HBlank;
 	vbl <= VBlank;
 
-	casex({ulap_ena, ulap_mono})
+	casex({ulap_ena & ~ss_active, ulap_mono})
 		'b0X: {Gx,Rx,Bx} <= {G, G, {6{I & G}}, R, R, {6{I & R}}, B, B, {6{I & B}}};
 		'b10: {Gx,Rx,Bx} <= {{2{ulap_color[7:5]}}, ulap_color[7:6], {2{ulap_color[4:2]}}, ulap_color[4:3], {4{ulap_color[1:0]}}};
 		'b11: {Gx,Rx,Bx} <= {3{ulap_color}};
@@ -1003,7 +1036,7 @@ wire  [2:0] mod;
 wire  [4:0] key_data;
 wire recreated_zx = status[37];
 wire ghosting     = status[36];
-keyboard kbd( .* );
+keyboard kbd( .*, .ps2_key(ss_ps2_key) );
 
 wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
@@ -1092,7 +1125,7 @@ wire       mmc_ready;
 divmmc divmmc
 (
 	.*,
-	.disable_pagein(tape_loaded),
+	.disable_pagein(tape_loaded | ss_active),
 	.mode(mmc_mode), //00-off, 01-divmmc, 10-zxmmc, 11-divmmc+esxdos
 	.din(cpu_dout),
 	.dout(mmc_dout),
@@ -1125,6 +1158,7 @@ sd_card sd_card
 	.sd_wr(sd_wr_mmc),
 	.sd_ack(sd_ack[1]),
 	.sd_lba(sd_lba_mmc),
+	.sd_buff_addr(sd_buff_addr[8:0]),
 	.sd_buff_din(sd_buff_din_mmc),
 	.sd_buff_wr(sd_buff_wr),
 
@@ -1263,7 +1297,7 @@ wd1793 #(1) wd1793
 	.sd_rd(sd_rd_wd),
 	.sd_wr(sd_wr_wd), 
 	.sd_ack(sd_ack[0]),
-	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_addr(sd_buff_addr[8:0]),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din_wd), 
 	.sd_buff_wr(sd_buff_wr),
@@ -1305,7 +1339,7 @@ u765 #(20'd1800,1) u765
 	.sd_rd(sd_rd_plus3),
 	.sd_wr(sd_wr_plus3),
 	.sd_ack(sd_ack[0]),
-	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_addr(sd_buff_addr[8:0]),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din_plus3),
 	.sd_buff_wr(sd_buff_wr)
@@ -1350,7 +1384,7 @@ smart_tape tape
 	.tape_mode(ioctl_index[7:6]),
 
 	.m1(~nM1 & ~nMREQ),
-	.rom_en(active_48_rom),
+	.rom_en(active_48_rom & ~ss_active),
 	.dout_en(tape_dout_en),
 	.dout(tape_dout)
 );
@@ -1455,6 +1489,127 @@ snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128, ARCH_SCORP) snap_loade
    .border(snap_border),
    .reg_1ffd(snap_1ffd),
    .reg_7ffd(snap_7ffd)
+);
+
+wire        ss_active;
+wire        ss_joy_block;
+wire        ss_stop_req;
+wire        ss_stopped;
+wire        ss_freezing;
+wire        ss_cpu_reset;
+wire[211:0] ss_dir;
+wire        ss_dir_set;
+wire        ss_set_ports;
+wire  [2:0] ss_new_border;
+wire        ss_new_ear;
+wire        ss_new_mic;
+wire  [7:0] ss_new_7ffd;
+wire  [7:0] ss_new_1ffd;
+wire  [3:0] ss_bank;
+wire        ss_dout_en;
+wire  [7:0] ss_dout;
+wire  [7:0] ss_ula_q;
+wire  [2:0] ss_ula_border;
+
+wire [63:0] ss_rtc;
+wire [31:0] ss_timestamp;
+
+savestate_clock savestate_clock
+(
+	.clk(clk_sys),
+	.RTC(RTC),
+	.TIMESTAMP(TIMESTAMP),
+	.rtc(ss_rtc),
+	.timestamp(ss_timestamp)
+);
+
+reg ss_old_download;
+always @(posedge clk_sys) ss_old_download <= ioctl_download;
+
+savestate_dev #("rtl/savestate_rom.mif") savestate_dev
+(
+	.clk_sys(clk_sys),
+	.reset(reset),
+	.new_game(ss_old_download & ~ioctl_download),
+	.game_load(ioctl_download & ((ioctl_index[4:0] == 2) | (ioctl_index[4:0] == 4))),
+	.ioctl_wr(ioctl_wr),
+	.ioctl_dout(ioctl_dout),
+	.other_image(|img_mounted[1:0]),
+
+	.ps2_key(ps2_key),
+	.ps2_key_kbd(ss_ps2_key),
+	.joy0(joy0_hps),
+	.joy1(joy1_hps),
+	.joy_block(ss_joy_block),
+
+	.m1(m1),
+	.cpu_din(cpu_din),
+	.ce_cpu_p(ce_cpu_p),
+	.cpu_n(cpu_n),
+	.cpu_en(cpu_en),
+	.cpu_halted(~nHALT),
+	.no_stop(NMI | trdos_en | plusd_mem | mf128_mem | mmc_rom_en | mmc_ram_en | shadow_rom | (scorp & scorp_1ffd[1])),
+	.stop_req(ss_stop_req),
+	.stopped(ss_stopped),
+	.freezing(ss_freezing),
+
+	.cpu_reg(cpu_reg),
+	.cpu_reset(ss_cpu_reset),
+	.dir(ss_dir),
+	.dir_set(ss_dir_set),
+
+	.border(border_color),
+	.ear(ear_out),
+	.mic(mic_out),
+	.port_7ffd(page_reg),
+	.port_1ffd(scorp ? scorp_1ffd : page_reg_plus3),
+	.arch({cur_mode, status[9:8]}),
+	.issue2(~status[7]),
+	.set_ports(ss_set_ports),
+	.new_border(ss_new_border),
+	.new_ear(ss_new_ear),
+	.new_mic(ss_new_mic),
+	.new_7ffd(ss_new_7ffd),
+	.new_1ffd(ss_new_1ffd),
+	.rtc(ss_rtc),
+	.timestamp(ss_timestamp),
+	.nINT(nINT),
+
+	.aud_reset(aud_reset),
+	.psg_bdir(psg_we),
+	.psg_bc(addr[14]),
+	.psg_di(cpu_dout),
+
+	.addr(addr),
+	.cpu_dout(cpu_dout),
+	.nMREQ(nMREQ),
+	.nIORQ(nIORQ),
+	.nRD(nRD),
+	.nWR(nWR),
+	.nM1(nM1),
+	.active(ss_active),
+	.bank(ss_bank),
+	.dout_en(ss_dout_en),
+	.dout(ss_dout),
+
+	.vram_addr(vram_addr[12:0]),
+	.vram_q(vram_dout),
+	.ula_q(ss_ula_q),
+	.border_in(border_color),
+	.ula_border(ss_ula_border),
+
+	.img_mounted(img_mounted[2]),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+	.sd_lba(sd_lba_ss),
+	.sd_blk_cnt(sd_blk_cnt_ss),
+	.sd_rd(sd_rd_ss),
+	.sd_wr(sd_wr_ss),
+	.sd_ack(sd_ack[2]),
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din_ss),
+	.sd_buff_wr(sd_buff_wr)
 );
 
 endmodule

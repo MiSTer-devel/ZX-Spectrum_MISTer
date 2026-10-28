@@ -1,0 +1,5 @@
+savestate_rom.bin
+savestate_rom.hex
+savestate_rom.lst
+pokes.lst
+*.sym

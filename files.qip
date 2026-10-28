@@ -18,6 +18,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/sound/hq_comp_rom.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ym2149.sv
 set_global_assignment -name VERILOG_FILE rtl/gs.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/snap_loader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate_dev.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate_stop.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate_clock.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/u765.sv
 set_global_assignment -name VERILOG_FILE rtl/divmmc.v
