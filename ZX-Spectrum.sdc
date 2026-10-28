@@ -19,6 +19,8 @@ set_multicycle_path -to   {emu|cpu|*} -hold 1
 # CPU clock enables are single-cycle pulses, so they must reach the T80 within one clock
 set_multicycle_path -from {emu|ce_7mn* emu|ce_cpu_t* emu|cpu_en*} -to {emu|cpu|*} -setup 1
 set_multicycle_path -from {emu|ce_7mn* emu|ce_cpu_t* emu|cpu_en*} -to {emu|cpu|*} -hold 0
+set_multicycle_path -to   {emu|savestate_dev|stop|opc[*]} -setup 2
+set_multicycle_path -to   {emu|savestate_dev|stop|opc[*]} -hold 1
 
 # The CE is only active in every 2 clocks, so allow 2 clock cycles
 set_multicycle_path -from {emu|tape|*} -setup 2
