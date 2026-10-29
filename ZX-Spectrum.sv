@@ -66,6 +66,7 @@ localparam CONF_STR = {
 	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
 	"S1,VHD,Load DivMMC;",
+	"F6,ROMMLD,Load Dandanator;",
 	"SC2,SAV,Savestate Disk;",
 	"-;",
 
@@ -83,7 +84,7 @@ localparam CONF_STR = {
 	"P3,Audio;",
 	"P3-;",
 	"P3O[21:20],General Sound,512KB,1MB,2MB,Disabled;",
-	"P3O[43:42],Covox,Disabled,#FB,#DD (Scorpion),#5F/#3F (Profi);",
+	"P3O[61:59],Covox,Disabled,#FB,#DD (Scorpion),#5F/#3F (Profi),#DF (SpecDrum);",
 	"P3O[3:2],Stereo Mix,none,25%,50%,100%;",
 	"P3-;",
 	"P3O[39],PSG/FM,Enabled,Disabled;",
@@ -110,6 +111,8 @@ localparam CONF_STR = {
 	"P2-;",
 	"P2O[33:32],MMC Mode,Auto(VHD),SD Card 14MHz,SD Card 28MHz;",
 	"P2O[31:30],MMC Version,DivMMC+ESXDOS,DivMMC,ZXMMC;",
+	"P2-;",
+	"P2O[62],Dandanator,Disabled,Enabled;",
 
 	"-;",
 	"O[37:36],Keyboard,Normal,Ghosting,Recreated ZX,Recr+Ghosting;",
@@ -121,6 +124,7 @@ localparam CONF_STR = {
 	"O[24:22],CPU Speed,Original,7MHz,14MHz,28MHz,56MHz;",
 	"-;",
 	"R[0],Reset & Apply;",
+	"R[63],Reset & Detach Cartridge;",
 	"J,Fire 1,Fire 2,Savestates;",
 	"V,v",`BUILD_DATE
 };
@@ -289,6 +293,16 @@ wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
+wire        dl_dan = ioctl_download && ioctl_index[4:0] == 6;
+
+// Loading a cartridge turns the Dandanator option on.
+reg         opt_dan = 0;
+always @(posedge clk_sys) begin
+	reg old_dan = 0;
+	old_dan <= dl_dan;
+	opt_dan <= old_dan & ~dl_dan & ~status[62];
+end
+
 wire [21:0] gamma_bus;
 wire [64:0] RTC;
 wire [32:0] TIMESTAMP;
@@ -309,8 +323,10 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.new_vmode(new_vmode),
 	.status(status),
 	.status_menumask({status[55],status[9:8] != 2,|status[9:8],en1080p,|vcrop,~need_apply}),
-	.status_set(speed_set|arch_set|snap_hwset),
-	.status_in({status[63:25], speed_set ? speed_req : 3'b000, status[21:13], arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
+	.status_set(speed_set|arch_set|snap_hwset|opt_dan),
+	.status_in({status[63], status[62] | opt_dan, status[61:25],
+	             speed_set ? speed_req : (arch_set | snap_hwset) ? 3'b000 : status[24:22], status[21:13],
+	             arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_blk_cnt(sd_blk_cnt),
@@ -358,7 +374,9 @@ wire        nRFSH;
 wire        nBUSACK;
 wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
-wire        reset  = buttons[1] | status[0] | cold_reset | warm_reset | shdw_reset | Fn[10] | mmc_reset;
+wire        dan_reset, dan_nmi_n;
+wire        reset_core = buttons[1] | status[0] | status[63] | cold_reset | warm_reset | shdw_reset | Fn[10] | mmc_reset;
+wire        reset  = reset_core | dan_reset;
 
 wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset | snap_reset | mmc_reset;
 wire        warm_reset = (mod[2:1] == 2) & Fn[11];
@@ -381,7 +399,7 @@ T80pa cpu
 	.CEN_n(ce_cpu_n),
 	.WAIT_n(mmc_ready),
 	.INT_n(nINT),
-	.NMI_n(~NMI),
+	.NMI_n(~NMI & dan_nmi_n),
 	.BUSRQ_n(nBUSRQ),
 	.M1_n(nM1),
 	.MREQ_n(nMREQ),
@@ -436,6 +454,29 @@ always @(posedge clk_sys) begin
 end
 
 
+//////////////////   DANDANATOR   //////////////////
+// The cartridge ROM (512 KB) sits in SDRAM bank 2, from 16 MB.
+wire [4:0] dan_page;
+wire       dan_rom;
+
+dandanator dan
+(
+	.clk(clk_sys),
+	.reset(reset_core),
+	.en(status[62]),
+	.dl(dl_dan),
+	.home_req(status[0] | ((mod[2:1] == 1) & Fn[11])),
+	.detach(status[63]),
+	.addr(addr),
+	.nMREQ(nMREQ | ss_active),
+	.nWR(nWR),
+	.page(dan_page),
+	.rom(dan_rom),
+	.nmi_n(dan_nmi_n),
+	.reset_req(dan_reset)
+);
+
+
 //////////////////   MEMORY   //////////////////
 reg  [24:0] ram_addr;
 reg   [7:0] ram_din;
@@ -445,7 +486,7 @@ wire  [7:0] ram_dout;
 wire        ram_ready;
 
 reg [24:0] load_addr;
-always @(posedge clk_sys) load_addr <= ioctl_addr + (ioctl_index[4:0] ? 25'h400000 : ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
+always @(posedge clk_sys) load_addr <= ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 : ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
 
 reg load;
 always @(posedge clk_sys) load <= (reset | ~nBUSACK) & ~nBUSRQ;
@@ -456,7 +497,7 @@ always_comb begin
 		'b01XX_X_XX: ram_addr = load_addr;
 		'b001X_X_XX: ram_addr = tape_addr;
 		'b0001_X_XX: ram_addr = { 4'b1000, mmc_ram_bank,                                     addr[12:0]};
-		'b0000_0_00: ram_addr = scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, addr[13:0] } : { 3'b110, page_rom, addr[13:0] })
+		'b0000_0_00: ram_addr = dan_rom ? { 6'b100000, dan_page, addr[13:0] } : scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, addr[13:0] } : { 3'b110, page_rom, addr[13:0] })
 		                              : { 3'b101, page_rom, addr[13:0] }; //ROM (scorp: RAM bank 0 / Scorpion ROM window)
 		'b0000_0_01: ram_addr = scorp ? { 1'b0, 4'd5, addr[13:0] } : { 4'b0000, 3'd5, addr[13:0] }; // #4000: bank 5 fixed (screen)
 		'b0000_0_10: ram_addr = scorp ? { 1'b0, 4'd2, addr[13:0] } : { 4'b0000, 3'd2, addr[13:0] }; // #8000: bank 2 fixed
@@ -484,7 +525,7 @@ always_comb begin
 		'b1XX: ram_we = snap_wr;
 		'b01X: ram_we = ioctl_wr;
 		'b001: ram_we = 0;
-		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | (~scorp & (plusd_mem | mf128_mem) & addr[13]) | (scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
+		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | (~dan_rom & ~scorp & (plusd_mem | mf128_mem) & addr[13]) | (~dan_rom & scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
 	endcase
 
 	if(ss_active) begin
@@ -817,18 +858,20 @@ wire gs_sel = (addr[7:0] ==? 'b1011?011) & ~&status[21:20];
 // #FB         - mono (Pentagon/classic)
 // #DD         - mono (Scorpion)
 // #5F/#3F     - left/right (Profi), outside of TR-DOS where these are WD1793 ports
+// #DF         - mono (Cheetah SpecDrum)
 reg [7:0] covox_l = 8'h80, covox_r = 8'h80;
 always @(posedge clk_sys) begin
 	if(reset) {covox_l, covox_r} <= 16'h8080;
 	else if(io_wr) begin
-		case(status[43:42])
+		case(status[61:59])
 			1: if(addr[7:0] == 8'hFB) {covox_l, covox_r} <= {cpu_dout, cpu_dout};
 			2: if(addr[7:0] == 8'hDD) {covox_l, covox_r} <= {cpu_dout, cpu_dout};
 			3: if(~trdos_en) begin
 					if(addr[7:0] == 8'h5F) covox_l <= cpu_dout;
 					if(addr[7:0] == 8'h3F) covox_r <= cpu_dout;
 				end
-			0: ;
+			4: if(addr[7:0] == 8'hDF) {covox_l, covox_r} <= {cpu_dout, cpu_dout};
+			default: ;
 		endcase
 	end
 end
@@ -1042,11 +1085,12 @@ wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
 mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]), .wheel_inv(status[49]));
 
-// Joystick #1F and mouse #xxDF differ only in A7/A6, so each needs a full
-// low-byte compare; a six-bit one matches both
+// Joystick on #1F #5F #9F #DF (games read it on all four); with the mouse
+// enabled #xxDF goes to the mouse. An unanswered port reads the floating bus,
+// which looks like directions held.
 wire       beta_port = &addr[4:0] & (~addr[7] | &addr[7:5]); // #1F #3F #5F #7F #FF
-wire       kemp_sel  = (addr[7:0] == 8'h1F) & ~(scorp & beta_port & scorp_1ffd[1]);
 wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
+wire       kemp_sel  = (addr[5:0] == 6'h1F) & ~mouse_sel & ~(scorp & beta_port & scorp_1ffd[1]);
 reg  [7:0] kemp_dout;
 always @(posedge clk_sys) kemp_dout <= mouse_sel ? mouse_data : {2'b00, joyk};
 

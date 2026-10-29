@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Savestate Card Manager</title>
+<style>
+:root {
+	--bg: #f4f5f7;
+	--panel: #ffffff;
+	--ink: #1d2128;
+	--muted: #6b7280;
+	--line: #d9dce1;
+	--accent: #1f5fd1;
+	--accent-ink: #ffffff;
+	--danger: #c0362c;
+	--empty: #eceef1;
+	--shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--bg: #15171b;
+		--panel: #1f2228;
+		--ink: #e7e9ee;
+		--muted: #9aa1ad;
+		--line: #343842;
+		--accent: #5b8ff0;
+		--accent-ink: #0d1117;
+		--danger: #ef6b5f;
+		--empty: #262a31;
+		--shadow: none;
+	}
+}
+:root[data-theme="dark"] {
+	--bg: #15171b; --panel: #1f2228; --ink: #e7e9ee; --muted: #9aa1ad; --line: #343842;
+	--accent: #5b8ff0; --accent-ink: #0d1117; --danger: #ef6b5f; --empty: #262a31; --shadow: none;
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+	position: sticky; top: 0; z-index: 2;
+	display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+	padding: 10px 16px;
+	background: var(--panel);
+	border-bottom: 1px solid var(--line);
+}
+header h1 { font-size: 16px; margin: 0 8px 0 0; font-weight: 600; }
+.file { color: var(--muted); overflow-wrap: anywhere; }
+.spacer { flex: 1; }
+button, .btn {
+	font: inherit; cursor: pointer;
+	padding: 5px 11px; border-radius: 6px;
+	border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+button:disabled { opacity: .45; cursor: default; }
+main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+#intro { max-width: 640px; margin: 40px auto; text-align: center; color: var(--muted); }
+#intro p { margin: 8px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.slot {
+	background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+	padding: 10px; box-shadow: var(--shadow);
+	display: flex; flex-direction: column; gap: 8px;
+}
+.slot.drop { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.slot .top { display: flex; align-items: baseline; gap: 8px; }
+.slot .num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.slot .model { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.slot .when { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.screen {
+	width: 100%; aspect-ratio: 288 / 224; border-radius: 4px;
+	image-rendering: pixelated; background: var(--empty); display: block;
+}
+.blank {
+	width: 100%; aspect-ratio: 288 / 224; border-radius: 4px; border: 1px dashed var(--line);
+	background: var(--empty); color: var(--muted);
+	display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px;
+}
+.name {
+	font: inherit; width: 100%; padding: 5px 8px; border-radius: 6px;
+	border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+.name:disabled { opacity: .5; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.actions button { padding: 3px 9px; font-size: 13px; }
+#toast {
+	position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+	max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 8px;
+	background: var(--ink); color: var(--bg); opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+#toast.show { opacity: .95; }
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); max-width: min(420px, calc(100% - 32px)); }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog label { display: block; margin: 10px 0; }
+dialog select { font: inherit; padding: 4px; }
+.right { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.note { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+	<h1>Savestate Card</h1>
+	<button id="open" class="primary">Open card…</button>
+	<button id="new">New card…</button>
+	<button id="save" disabled>Save card</button>
+	<button id="pokes" disabled>POKEs…</button>
+	<span class="file" id="file"></span>
+	<span class="spacer"></span>
+	<span class="file" id="count"></span>
+</header>
+<main>
+	<div id="intro">
+		<p><b>Savestate card manager</b> for the MiSTer ZX Spectrum core.</p>
+		<p>Open the card (<code>.sav</code>) from the SD card, or drop it here. You can name the slots,
+		take a game out as <code>.z80</code>, or put in a <code>.z80</code>, <code>.sna</code> or <code>.szx</code>
+		snapshot by dropping it on a slot.</p>
+		<p>With <b>POKEs…</b> the card gets the cheats of a collection of <code>.pok</code> files (a
+		<code>.zip</code> of them is fine), for the core's savestate window (P).</p>
+		<p>Nothing leaves your computer: the card is read and written by this page alone.</p>
+	</div>
+	<div class="grid" id="grid"></div>
+</main>
+<div id="toast"></div>
+<dialog id="newdlg">
+	<form method="dialog">
+		<b>New savestate card</b>
+		<label>Slots
+			<select id="newslots">
+				<option>8</option><option>16</option><option>32</option><option selected>64</option>
+			</select>
+		</label>
+		<div class="right"><button value="cancel">Cancel</button><button value="ok" class="primary">Create</button></div>
+	</form>
+</dialog>
+<dialog id="pokedlg">
+	<form method="dialog">
+		<b>POKEs</b>
+		<p id="pokestate"></p>
+		<p class="note">.POK files, one per game, such as the collection at
+		github.com/ladyeklipse/all-tipshop-pokes. They replace the ones on the card.</p>
+		<div class="right">
+			<button value="remove" id="pokeremove">Remove</button>
+			<button value="cancel">Close</button>
+			<button value="choose" class="primary" id="pokechoose">Choose .zip or .pok…</button>
+		</div>
+	</form>
+</dialog>
+<input type="file" id="pickcard" accept=".sav,.vhd,.img,.bin" hidden>
+<input type="file" id="pickpokes" accept=".zip,.pok" multiple hidden>
+<input type="file" id="picksnap" accept=".z80,.sna,.szx" hidden>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// Card layout, as written by the core (savestates_rom/savestate_rom.asm)
+
+const SECTOR = 512;
+const FIRST_LBA = 64;
+const SLOT_SECS = 576;
+const SLOTS_MAX = 64;
+const DATA_OFS = 16;
+const DATA_MAX = 560 * SECTOR;
+const CARD_MAGIC = 'ZXSTATES';
+
+// status[12:8] of the core: memory option in bits 4-2, video timing in 1-0
+const MODELS = {
+	48:    { arch: 0b01100, hw: 0,  name: '48K',      banks: [5, 2, 0] },
+	128:   { arch: 0b00001, hw: 4,  name: '128K',     banks: [0, 1, 2, 3, 4, 5, 6, 7] },
+	plus3: { arch: 0b10001, hw: 7,  name: '+3',       banks: [0, 1, 2, 3, 4, 5, 6, 7] },
+	pent:  { arch: 0b00010, hw: 9,  name: 'Pentagon', banks: [0, 1, 2, 3, 4, 5, 6, 7] },
+	scorp: { arch: 0b10111, hw: 10, name: 'Scorpion', banks: [...Array(16).keys()] },
+};
+
+function archName(arch) {
+	switch (arch >> 2) {
+		case 3: return '48K';
+		case 0: return (arch & 3) === 2 ? 'Pentagon' : '128K';
+		case 4: return '+3';
+		case 5: return 'Scorpion';
+		default: return '?';
+	}
+}
+
+const ascii = (bytes) => String.fromCharCode(...bytes);
+const le = (b, o, n) => { let v = 0; for (let i = n - 1; i >= 0; i--) v = v * 256 + b[o + i]; return v; };
+const bcd = (v) => ((v >> 4) * 10 + (v & 15));
+const toBcd = (n) => ((Math.floor(n / 10) << 4) | (n % 10));
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function slotLba(n) { return FIRST_LBA + n * SLOT_SECS; }
+
+class Card {
+	constructor(bytes, name) {
+		this.bytes = bytes;
+		this.name = name;
+		this.dirty = false;
+	}
+
+	static create(slots) {
+		const b = new Uint8Array((FIRST_LBA + slots * SLOT_SECS) * SECTOR);
+		Card.writeHeader(b);
+		return b;
+	}
+
+	static writeHeader(b) {
+		b.set([...CARD_MAGIC].map(c => c.charCodeAt(0)), 0);
+		b[8] = 1; b[9] = 0;
+		b[10] = SLOTS_MAX; b[11] = 0;
+		b[12] = SLOT_SECS & 255; b[13] = SLOT_SECS >> 8;
+		b[14] = FIRST_LBA; b[15] = 0;
+	}
+
+	// 'ok', 'blank' (all zeros: the core formats it) or an error text
+	check() {
+		const b = this.bytes;
+		if (b.length < (FIRST_LBA + SLOT_SECS) * SECTOR) return 'The file is too small for a savestate card.';
+		if (ascii(b.subarray(0, 8)) === CARD_MAGIC) {
+			if (b[8] !== 1 || le(b, 10, 2) !== SLOTS_MAX || le(b, 12, 2) !== SLOT_SECS || le(b, 14, 2) !== FIRST_LBA)
+				return 'This card has a layout this page does not know.';
+			return 'ok';
+		}
+		if (b.subarray(0, SECTOR).every(v => v === 0)) return 'blank';
+		return 'This is not a savestate card.';
+	}
+
+	get slots() {
+		return Math.min(SLOTS_MAX, Math.floor((this.bytes.length / SECTOR - FIRST_LBA) / SLOT_SECS));
+	}
+
+	slot(n) {
+		const base = slotLba(n) * SECTOR;
+		const h = this.bytes.subarray(base, base + SECTOR);
+		const valid = ascii(h.subarray(0, 4)) === 'ZXSS' && h[4] === 1 && h[5] === 1;
+		const s = { n, valid, base };
+		if (!valid) return s;
+		s.format = h[6];
+		s.arch = h[7];
+		s.length = le(h, 8, 3);
+		s.timestamp = le(h, 12, 4);
+		s.rtc = h.slice(16, 24);
+		s.border = h[24] & 7;
+		s.hasScreen = h[25] === 1;
+		let name = '';
+		for (let i = 32; i < 64 && h[i]; i++) name += String.fromCharCode(h[i] >= 32 && h[i] < 127 ? h[i] : 32);
+		s.name = name;
+		return s;
+	}
+
+	screen(n) { const o = (slotLba(n) + 1) * SECTOR; return this.bytes.subarray(o, o + 6912); }
+
+	// games in the POKEs database, 0 for none
+	get pokes() {
+		const o = POKES_DESC_LBA * SECTOR;
+		if (this.bytes.length < o + SECTOR || ascii(this.bytes.subarray(o, o + 7)) !== 'ZXPOKES' || this.bytes[o + 7] !== 1) return 0;
+		return le(this.bytes, o + 8, 2);
+	}
+
+	setPokes(desc, db) {
+		const end = POKES_LBA * SECTOR;
+		const b = new Uint8Array(end + (db ? db.length : 0));
+		b.set(this.bytes.subarray(0, Math.min(end, this.bytes.length)));
+		if (db) { b.set(desc, POKES_DESC_LBA * SECTOR); b.set(db, end); }
+		else b.fill(0, POKES_DESC_LBA * SECTOR, (POKES_DESC_LBA + 1) * SECTOR);
+		this.bytes = b;
+		this.dirty = true;
+	}
+	data(s) { const o = (slotLba(s.n) + DATA_OFS) * SECTOR; return this.bytes.slice(o, o + s.length); }
+
+	setName(n, name) {
+		const o = slotLba(n) * SECTOR + 32;
+		const b = new Uint8Array(32);
+		// the Spectrum font has no accents: Ñandú becomes Nandu
+		name = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u2010-\u2015]/g, '-');
+		for (let i = 0; i < Math.min(32, name.length); i++) {
+			const c = name.charCodeAt(i);
+			b[i] = c >= 32 && c < 127 ? c : 63;
+		}
+		this.bytes.set(b, o);
+		this.dirty = true;
+	}
+
+	erase(n) {
+		const o = slotLba(n) * SECTOR;
+		this.bytes.fill(0, o, o + (DATA_OFS * SECTOR));
+		this.dirty = true;
+	}
+
+	// a snapshot in the core's own form: .z80 v3 file, screen, header
+	put(n, snap, name) {
+		const file = writeZ80(snap);
+		if (file.length > DATA_MAX) throw new Error('The snapshot does not fit in a slot.');
+		const base = slotLba(n) * SECTOR;
+		this.bytes.fill(0, base, base + SLOT_SECS * SECTOR);
+		const h = new Uint8Array(SECTOR);
+		h.set([90, 88, 83, 83, 1, 1, 0, snap.model.arch]);
+		h[8] = file.length & 255; h[9] = (file.length >> 8) & 255; h[10] = file.length >> 16;
+		const now = new Date();
+		const ts = Math.floor(now.getTime() / 1000 - now.getTimezoneOffset() * 60);
+		for (let i = 0; i < 4; i++) h[12 + i] = (ts >>> (8 * i)) & 255;
+		h.set([toBcd(now.getSeconds()), toBcd(now.getMinutes()), toBcd(now.getHours()), toBcd(now.getDate()),
+		       toBcd(now.getMonth() + 1), toBcd(now.getFullYear() % 100), now.getDay(), 0x40], 16);
+		h[24] = snap.border & 7;
+		h[25] = 1;
+		this.bytes.set(h, base);
+		this.setName(n, name);
+		const scrBank = (snap.model.hw !== 0 && (snap.p7ffd & 8)) ? 7 : 5;
+		this.bytes.set(snap.banks[scrBank].subarray(0, 6912), base + SECTOR);
+		this.bytes.set(file, base + DATA_OFS * SECTOR);
+		this.dirty = true;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POKEs: .POK files into a database for the core (savestates_rom/pokes.asm).
+// make_pokes.py, in this folder, builds the same bytes and describes
+// the layout: a descriptor at LBA 1, the index and the data after the last
+// slot.
+
+const POKES_DESC_LBA = 1;
+const POKES_LBA = FIRST_LBA + SLOTS_MAX * SLOT_SECS;
+const POK_LIST_LEN = 29, POK_NAME_MAX = 64, POK_CHEATS_MAX = 128, POK_GAME_MAX = 16384 - 512;
+
+function latin1(bytes) {
+	let s = '';
+	for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192));
+	return s;
+}
+
+function pokAscii(s, n) {
+	let o = '';
+	for (const c of s) o += (c >= ' ' && c <= '~') ? c : '?';
+	return o.slice(0, n);
+}
+
+// 29 characters: the name, or the title and year without the publisher
+function pokListName(full) {
+	if (full.length <= POK_LIST_LEN) return full;
+	const m = /^(.*?) (\([^()]*\))\(/.exec(full);
+	if (m) {
+		const room = POK_LIST_LEN - m[2].length - 1;
+		if (room >= 8) return m[1].slice(0, room).trimEnd() + ' ' + m[2];
+	}
+	return full.slice(0, POK_LIST_LEN);
+}
+
+// [[cheat name, [[bank, address, value, before], ...]], ...]
+function parsePok(text) {
+	const cheats = [];
+	for (const line of text.split(/\r\n|\r|\n/)) {
+		if (!line.trim()) continue;
+		const k = line[0].toUpperCase();
+		if (k === 'N') cheats.push([line.slice(1).trim(), []]);
+		else if ((k === 'M' || k === 'Z') && cheats.length) {
+			const f = line.slice(1).trim().split(/\s+/);
+			if (f.length === 4 && f.every(x => /^\d+$/.test(x))) cheats[cheats.length - 1][1].push(f.map(Number));
+		} else if (k === 'Y') break;
+	}
+	return cheats.filter(c => c[1].length);
+}
+
+function pokRange(name) {
+	const m = /\((\d+)\s*-\s*(\d+)\)/.exec(name);
+	if (!m) return [0, 255];
+	const a = Math.min(Number(m[1]), 255), b = Math.min(Number(m[2]), 255);
+	return a <= b ? [a, b] : [b, a];
+}
+
+function pokGame(full, cheats) {
+	const b = [];
+	const text = (t) => { b.push(t.length); for (const c of t) b.push(c.charCodeAt(0)); };
+	text(pokAscii(full, POK_NAME_MAX));
+	cheats = cheats.slice(0, POK_CHEATS_MAX);
+	b.push(cheats.length);
+	for (const [name, pokes] of cheats) {
+		text(pokAscii(name, POK_NAME_MAX));
+		b.push(...pokRange(name), pokes.length & 255, pokes.length >> 8);
+		for (const [bank, addr, value, before] of pokes)
+			b.push((value === 256 ? 0x80 : 0) | (bank < 8 ? bank : 8), addr & 255, (addr >> 8) & 255, value & 255, before & 255);
+	}
+	if (b.length > POK_GAME_MAX) throw new Error(full + ': too many cheats.');
+	return b;
+}
+
+const CRC_TABLE = (() => {
+	const t = new Uint32Array(256);
+	for (let n = 0; n < 256; n++) {
+		let c = n;
+		for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+		t[n] = c >>> 0;
+	}
+	return t;
+})();
+
+function crc32(bytes) {
+	let c = 0xFFFFFFFF;
+	for (const v of bytes) c = CRC_TABLE[(c ^ v) & 255] ^ (c >>> 8);
+	return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// files: [{name, text}] -> {desc, db, games, cheats}
+function buildPokes(files, dbLba = POKES_LBA) {
+	const games = [];
+	for (const f of files) {
+		const full = f.name.replace(/\\/g, '/').split('/').pop().replace(/\.[^.]*$/, '');
+		const cheats = parsePok(f.text);
+		if (cheats.length) games.push({ shown: pokListName(pokAscii(full, 200)).padEnd(POK_LIST_LEN), full, cheats });
+	}
+	const key = (g) => [g.shown.toUpperCase(), g.full.toUpperCase()];
+	games.sort((a, b) => {
+		const [a1, a2] = key(a), [b1, b2] = key(b);
+		return a1 < b1 ? -1 : a1 > b1 ? 1 : a2 < b2 ? -1 : a2 > b2 ? 1 : 0;
+	});
+	const index = [], data = [];
+	for (const g of games) {
+		for (const c of g.shown) index.push(c.charCodeAt(0));
+		index.push(data.length & 255, (data.length >> 8) & 255, (data.length >> 16) & 255);
+		for (const v of pokGame(g.full, g.cheats)) data.push(v);
+	}
+	const ixSecs = Math.ceil(index.length / SECTOR), dtSecs = Math.ceil(data.length / SECTOR);
+	const db = new Uint8Array((ixSecs + dtSecs) * SECTOR);
+	db.set(index, 0);
+	db.set(data, ixSecs * SECTOR);
+	const ident = crc32(db) || 1;
+	const desc = new Uint8Array(SECTOR);
+	desc.set([...'ZXPOKES'].map(c => c.charCodeAt(0)), 0);
+	const dv = new DataView(desc.buffer);
+	desc[7] = 1;
+	dv.setUint16(8, games.length, true);
+	dv.setUint32(12, dbLba, true);
+	dv.setUint32(16, dbLba + ixSecs, true);
+	dv.setUint32(20, dtSecs, true);
+	dv.setUint32(24, ident, true);
+	return { desc, db, games: games.length, cheats: games.reduce((n, g) => n + g.cheats.length, 0) };
+}
+
+// the .pok files of a .zip, in its order
+async function readZipPoks(bytes) {
+	const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	let e = bytes.length - 22;
+	while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+	if (e < 0) throw new Error('This is not a .zip file.');
+	const n = dv.getUint16(e + 10, true);
+	let o = dv.getUint32(e + 16, true);
+	const files = [];
+	for (let i = 0; i < n; i++) {
+		if (dv.getUint32(o, true) !== 0x02014b50) throw new Error('The .zip file is damaged.');
+		const flags = dv.getUint16(o + 8, true), method = dv.getUint16(o + 10, true), size = dv.getUint32(o + 20, true);
+		const nlen = dv.getUint16(o + 28, true), xlen = dv.getUint16(o + 30, true), clen = dv.getUint16(o + 32, true);
+		const local = dv.getUint32(o + 42, true);
+		const raw = bytes.subarray(o + 46, o + 46 + nlen);
+		const name = flags & 0x800 ? new TextDecoder().decode(raw) : latin1(raw);
+		o += 46 + nlen + xlen + clen;
+		if (!/\.pok$/i.test(name)) continue;
+		const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+		const packed = bytes.subarray(start, start + size);
+		let data;
+		if (method === 0) data = packed;
+		else if (method === 8) data = new Uint8Array(await new Response(new Blob([packed]).stream()
+			.pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+		else throw new Error(name + ' is packed in a way this page cannot read.');
+		files.push({ name, text: latin1(data) });
+	}
+	return files;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshots: everything is read into one form and written as the core does,
+// an uncompressed .z80 version 3 file.
+
+function newSnap(model) {
+	const banks = {};
+	for (const b of model.banks) banks[b] = new Uint8Array(16384);
+	return { model, banks, a: 0, f: 0, bc: 0, de: 0, hl: 0, a_: 0, f_: 0, bc_: 0, de_: 0, hl_: 0,
+	         ix: 0, iy: 0, sp: 0, pc: 0, i: 0, r: 0, iff1: 0, iff2: 0, im: 1, border: 0,
+	         p7ffd: 0, p1ffd: 0, ay: new Uint8Array(16), aySel: 0, issue2: 0 };
+}
+
+function writeZ80(s) {
+	const h = new Uint8Array(87);
+	const w = (o, v) => { h[o] = v & 255; h[o + 1] = (v >> 8) & 255; };
+	h[0] = s.a; h[1] = s.f; w(2, s.bc); w(4, s.hl); w(8, s.sp);
+	h[10] = s.i; h[11] = s.r & 0x7F; h[12] = ((s.r >> 7) & 1) | ((s.border & 7) << 1);
+	w(13, s.de); w(15, s.bc_); w(17, s.de_); w(19, s.hl_);
+	h[21] = s.a_; h[22] = s.f_; w(23, s.iy); w(25, s.ix);
+	h[27] = s.iff1 ? 1 : 0; h[28] = s.iff2 ? 1 : 0;
+	h[29] = 0x40 | ((s.issue2 & 1) << 2) | (s.im & 3);
+	w(30, 55); w(32, s.pc);
+	h[34] = s.model.hw; h[35] = s.p7ffd; h[37] = 0x04; h[38] = s.aySel;
+	h.set(s.ay, 39);
+	h[61] = h[62] = 0xFF;
+	h[86] = s.p1ffd;
+	const pages = s.model.hw === 0 ? [[4, 2], [5, 0], [8, 5]] : s.model.banks.map(b => [b + 3, b]);
+	const out = new Uint8Array(87 + pages.length * 16387);
+	out.set(h, 0);
+	let o = 87;
+	for (const [page, bank] of pages) {
+		out[o] = 0xFF; out[o + 1] = 0xFF; out[o + 2] = page;
+		out.set(s.banks[bank], o + 3);
+		o += 16387;
+	}
+	return out;
+}
+
+// the RLE of .z80 files: ED ED n b is b n times
+function unpackZ80(src, start, end, dst, limit) {
+	let i = start, o = 0;
+	while (i < end && o < limit) {
+		if (src[i] === 0xED && i + 1 < end && src[i + 1] === 0xED) {
+			const n = src[i + 2], v = src[i + 3];
+			for (let k = 0; k < n && o < limit; k++) dst[o++] = v;
+			i += 4;
+		} else {
+			dst[o++] = src[i++];
+		}
+	}
+	return i;
+}
+
+function readZ80(b) {
+	if (b.length < 30) throw new Error('Too short for a .z80 file.');
+	let pc = le(b, 6, 2);
+	const b12 = b[12] === 0xFF ? 1 : b[12];
+	let model, ext = 0, hw = 0;
+	if (pc !== 0) {
+		model = MODELS[48];
+	} else {
+		ext = le(b, 30, 2);
+		pc = le(b, 32, 2);
+		hw = b[34];
+		const v2 = ext === 23;
+		if (hw === 0 || hw === 1 || (hw === 3 && !v2)) model = MODELS[48];
+		else if (hw === 3 || hw === 4 || hw === 5 || hw === 6 || hw === 12) model = MODELS[128];
+		else if (hw === 7 || hw === 8 || hw === 13) model = MODELS.plus3;
+		else if (hw === 9) model = MODELS.pent;
+		else if (hw === 10) model = MODELS.scorp;
+		else throw new Error('This .z80 is for a machine the core does not have (hardware ' + hw + ').');
+	}
+	const s = newSnap(model);
+	s.a = b[0]; s.f = b[1]; s.bc = le(b, 2, 2); s.hl = le(b, 4, 2); s.sp = le(b, 8, 2);
+	s.i = b[10]; s.r = (b[11] & 0x7F) | ((b12 & 1) << 7); s.border = (b12 >> 1) & 7;
+	s.de = le(b, 13, 2); s.bc_ = le(b, 15, 2); s.de_ = le(b, 17, 2); s.hl_ = le(b, 19, 2);
+	s.a_ = b[21]; s.f_ = b[22]; s.iy = le(b, 23, 2); s.ix = le(b, 25, 2);
+	s.iff1 = b[27] ? 1 : 0; s.iff2 = b[28] ? 1 : 0; s.im = b[29] & 3; s.issue2 = (b[29] >> 2) & 1;
+	s.pc = pc;
+	if (ext === 0) {
+		// version 1: 48K of RAM from #4000, maybe compressed
+		const ram = new Uint8Array(49152);
+		if (b12 & 0x20) unpackZ80(b, 30, b.length, ram, 49152);
+		else ram.set(b.subarray(30, 30 + 49152));
+		s.banks[5].set(ram.subarray(0, 16384));
+		s.banks[2].set(ram.subarray(16384, 32768));
+		s.banks[0].set(ram.subarray(32768, 49152));
+		return s;
+	}
+	s.p7ffd = b[35];
+	if (ext >= 23) { s.aySel = b[38]; s.ay.set(b.subarray(39, 55)); }
+	if (ext >= 55) s.p1ffd = b[86];
+	if (model === MODELS[48]) s.p7ffd = 0;
+	let o = 32 + ext;
+	while (o + 3 <= b.length) {
+		const len = le(b, o, 2), page = b[o + 2];
+		o += 3;
+		let bank;
+		if (model === MODELS[48]) bank = { 4: 2, 5: 0, 8: 5 }[page];
+		else bank = page - 3;
+		const raw = len === 0xFFFF;
+		const size = raw ? 16384 : len;
+		if (bank !== undefined && s.banks[bank]) {
+			if (raw) s.banks[bank].set(b.subarray(o, o + 16384));
+			else unpackZ80(b, o, o + len, s.banks[bank], 16384);
+		}
+		o += size;
+	}
+	return s;
+}
+
+function readSNA(b) {
+	const s = newSnap(b.length === 49179 ? MODELS[48] : MODELS[128]);
+	if (b.length !== 49179 && b.length !== 131103 && b.length !== 147487)
+		throw new Error('A .sna file is 49179, 131103 or 147487 bytes long.');
+	s.i = b[0]; s.hl_ = le(b, 1, 2); s.de_ = le(b, 3, 2); s.bc_ = le(b, 5, 2);
+	s.f_ = b[7]; s.a_ = b[8]; s.hl = le(b, 9, 2); s.de = le(b, 11, 2); s.bc = le(b, 13, 2);
+	s.iy = le(b, 15, 2); s.ix = le(b, 17, 2); s.iff1 = s.iff2 = (b[19] >> 2) & 1; s.r = b[20];
+	s.f = b[21]; s.a = b[22]; s.sp = le(b, 23, 2); s.im = b[25] & 3; s.border = b[26] & 7;
+	const ram = b.subarray(27, 27 + 49152);
+	if (b.length === 49179) {
+		s.banks[5].set(ram.subarray(0, 16384));
+		s.banks[2].set(ram.subarray(16384, 32768));
+		s.banks[0].set(ram.subarray(32768, 49152));
+		// the PC is on the stack
+		const at = (a) => a < 0x4000 ? 0 : a < 0x8000 ? s.banks[5][a - 0x4000] : a < 0xC000 ? s.banks[2][a - 0x8000] : s.banks[0][a - 0xC000];
+		s.pc = at(s.sp) | (at((s.sp + 1) & 0xFFFF) << 8);
+		s.sp = (s.sp + 2) & 0xFFFF;
+		return s;
+	}
+	s.pc = le(b, 49179, 2);
+	s.p7ffd = b[49181];
+	const top = s.p7ffd & 7;
+	s.banks[5].set(ram.subarray(0, 16384));
+	s.banks[2].set(ram.subarray(16384, 32768));
+	s.banks[top].set(ram.subarray(32768, 49152));
+	let o = 49183;
+	for (let bank = 0; bank < 8; bank++) {
+		if (bank === 2 || bank === 5 || bank === top) continue;
+		s.banks[bank].set(b.subarray(o, o + 16384));
+		o += 16384;
+	}
+	return s;
+}
+
+async function inflate(data) {
+	const ds = new DecompressionStream('deflate');
+	const out = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+	return new Uint8Array(out);
+}
+
+async function readSZX(b) {
+	if (ascii(b.subarray(0, 4)) !== 'ZXST') throw new Error('Not a .szx file.');
+	const id = b[6];
+	const model = { 1: MODELS[48], 15: MODELS[48], 2: MODELS[128], 3: MODELS[128], 16: MODELS[128],
+	                4: MODELS.plus3, 5: MODELS.plus3, 6: MODELS.plus3, 7: MODELS.pent, 10: MODELS.scorp }[id];
+	if (!model) throw new Error('This .szx is for a machine the core does not have (' + id + ').');
+	const s = newSnap(model);
+	let o = 8;
+	while (o + 8 <= b.length) {
+		const tag = ascii(b.subarray(o, o + 4)), size = le(b, o + 4, 4), d = b.subarray(o + 8, o + 8 + size);
+		o += 8 + size;
+		if (tag === 'Z80R') {
+			s.f = d[0]; s.a = d[1]; s.bc = le(d, 2, 2); s.de = le(d, 4, 2); s.hl = le(d, 6, 2);
+			s.f_ = d[8]; s.a_ = d[9]; s.bc_ = le(d, 10, 2); s.de_ = le(d, 12, 2); s.hl_ = le(d, 14, 2);
+			s.ix = le(d, 16, 2); s.iy = le(d, 18, 2); s.sp = le(d, 20, 2); s.pc = le(d, 22, 2);
+			s.i = d[24]; s.r = d[25]; s.iff1 = d[26] ? 1 : 0; s.iff2 = d[27] ? 1 : 0; s.im = d[28] & 3;
+		} else if (tag === 'SPCR') {
+			s.border = d[0] & 7; s.p7ffd = d[1]; s.p1ffd = d[2];
+		} else if (tag === 'AY\0\0') {
+			s.aySel = d[1]; s.ay.set(d.subarray(2, 18));
+		} else if (tag === 'RAMP') {
+			const flags = le(d, 0, 2), page = d[2];
+			const bytes = (flags & 1) ? await inflate(d.subarray(3)) : d.subarray(3, 3 + 16384);
+			let bank = page;
+			if (model === MODELS[48]) bank = page;
+			if (s.banks[bank]) s.banks[bank].set(bytes.subarray(0, 16384));
+		}
+	}
+	if (model === MODELS[48]) s.p7ffd = 0;
+	return s;
+}
+
+async function readSnapshot(bytes, fileName) {
+	const ext = fileName.toLowerCase().split('.').pop();
+	if (ext === 'z80') return readZ80(bytes);
+	if (ext === 'sna') return readSNA(bytes);
+	if (ext === 'szx') return await readSZX(bytes);
+	throw new Error('Only .z80, .sna and .szx snapshots can go in a slot.');
+}
+
+// ---------------------------------------------------------------------------
+// Pictures
+
+const PALETTE = [[0,0,0],[0,0,205],[205,0,0],[205,0,205],[0,205,0],[0,205,205],[205,205,0],[205,205,205]];
+const BRIGHT  = [[0,0,0],[0,0,255],[255,0,0],[255,0,255],[0,255,0],[0,255,255],[255,255,0],[255,255,255]];
+
+function drawScreen(canvas, scr, border) {
+	const W = 288, H = 224, X = 16, Y = 16;
+	canvas.width = W; canvas.height = H;
+	const ctx = canvas.getContext('2d');
+	const img = ctx.createImageData(W, H);
+	const px = img.data;
+	const bc = PALETTE[border & 7];
+	for (let i = 0; i < W * H; i++) { px[i * 4] = bc[0]; px[i * 4 + 1] = bc[1]; px[i * 4 + 2] = bc[2]; px[i * 4 + 3] = 255; }
+	for (let y = 0; y < 192; y++) {
+		const row = ((y & 0xC0) << 5) | ((y & 7) << 8) | ((y & 0x38) << 2);
+		for (let cx = 0; cx < 32; cx++) {
+			const bits = scr[row | cx], attr = scr[6144 + (y >> 3) * 32 + cx];
+			const pal = attr & 0x40 ? BRIGHT : PALETTE;
+			const ink = pal[attr & 7], paper = pal[(attr >> 3) & 7];
+			for (let bit = 0; bit < 8; bit++) {
+				const c = (bits >> (7 - bit)) & 1 ? ink : paper;
+				const p = ((Y + y) * W + X + cx * 8 + bit) * 4;
+				px[p] = c[0]; px[p + 1] = c[1]; px[p + 2] = c[2];
+			}
+		}
+	}
+	ctx.putImageData(img, 0, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Page
+
+const $ = (id) => document.getElementById(id);
+let card = null;
+let cardHandle = null;
+let importTarget = -1;
+
+function toast(text) {
+	const t = $('toast');
+	t.textContent = text;
+	t.classList.add('show');
+	clearTimeout(toast.timer);
+	toast.timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+function download(bytes, name, type = 'application/octet-stream') {
+	const a = document.createElement('a');
+	a.href = URL.createObjectURL(new Blob([bytes], { type }));
+	a.download = name;
+	document.body.appendChild(a);
+	a.click();
+	setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function safeName(s, n) {
+	const base = (s.name || 'slot ' + pad2(n + 1)).replace(/[\\/:*?"<>|]+/g, '_').trim();
+	return base || 'slot ' + pad2(n + 1);
+}
+
+function whenText(s) {
+	if (s.rtc && s.rtc.subarray(0, 6).some(v => v)) {
+		const r = s.rtc;
+		return `${pad2(bcd(r[3]))}/${pad2(bcd(r[4]))}/20${pad2(bcd(r[5]))} ${pad2(bcd(r[2]))}:${pad2(bcd(r[1]))}`;
+	}
+	if (s.timestamp) {
+		const d = new Date(s.timestamp * 1000);
+		return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+	}
+	return '';
+}
+
+function updateTop() {
+	$('save').disabled = !card || !card.dirty;
+	$('pokes').disabled = !card;
+	$('file').textContent = card ? card.name + (card.dirty ? ' — not saved' : '') : '';
+	if (card) {
+		let used = 0;
+		for (let n = 0; n < card.slots; n++) if (card.slot(n).valid) used++;
+		const pk = card.pokes;
+		$('count').textContent = `${used} of ${card.slots} slots used` + (pk ? ` · POKEs of ${pk} games` : '');
+	} else $('count').textContent = '';
+}
+
+function render() {
+	const grid = $('grid');
+	grid.textContent = '';
+	$('intro').hidden = !!card;
+	if (!card) { updateTop(); return; }
+	for (let n = 0; n < card.slots; n++) grid.appendChild(slotView(n));
+	updateTop();
+}
+
+function slotView(n) {
+	const s = card.slot(n);
+	const el = document.createElement('section');
+	el.className = 'slot';
+
+	const top = document.createElement('div');
+	top.className = 'top';
+	top.innerHTML = `<span class="num">Slot ${pad2(n + 1)}</span>`;
+	if (s.valid) {
+		const m = document.createElement('span');
+		m.className = 'model';
+		m.textContent = archName(s.arch);
+		top.appendChild(m);
+		const w = document.createElement('span');
+		w.className = 'when';
+		w.textContent = whenText(s);
+		top.appendChild(w);
+	}
+	el.appendChild(top);
+
+	if (s.valid) {
+		const c = document.createElement('canvas');
+		c.className = 'screen';
+		drawScreen(c, card.screen(n), s.border);
+		el.appendChild(c);
+	} else {
+		const b = document.createElement('div');
+		b.className = 'blank';
+		b.textContent = 'Empty — drop a .z80, .sna or .szx here';
+		el.appendChild(b);
+	}
+
+	const name = document.createElement('input');
+	name.className = 'name';
+	name.maxLength = 32;
+	name.placeholder = s.valid ? 'No name' : '';
+	name.value = s.valid ? s.name : '';
+	name.disabled = !s.valid;
+	name.setAttribute('aria-label', `Name of slot ${n + 1}`);
+	name.addEventListener('change', () => { card.setName(n, name.value); updateTop(); });
+	el.appendChild(name);
+
+	const act = document.createElement('div');
+	act.className = 'actions';
+	const btn = (text, fn, cls, enabled = true) => {
+		const b = document.createElement('button');
+		b.textContent = text;
+		if (cls) b.className = cls;
+		b.disabled = !enabled;
+		b.addEventListener('click', fn);
+		act.appendChild(b);
+	};
+	btn('Export .z80', () => {
+		const d = card.data(s);
+		download(d, safeName(s, n) + (s.format === 1 ? '.sna' : '.z80'));
+	}, '', s.valid);
+	btn('Screen PNG', () => {
+		const c = document.createElement('canvas');
+		drawScreen(c, card.screen(n), s.border);
+		c.toBlob((blob) => download(blob, safeName(s, n) + '.png', 'image/png'));
+	}, '', s.valid);
+	btn('Import…', () => { importTarget = n; $('picksnap').value = ''; $('picksnap').click(); });
+	btn('Empty', () => {
+		if (!confirm(`Empty slot ${n + 1}? The game saved in it is lost when the card is saved.`)) return;
+		card.erase(n);
+		el.replaceWith(slotView(n));
+		updateTop();
+	}, 'danger', s.valid);
+	el.appendChild(act);
+
+	el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drop'); });
+	el.addEventListener('dragleave', () => el.classList.remove('drop'));
+	el.addEventListener('drop', (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		el.classList.remove('drop');
+		const f = e.dataTransfer.files[0];
+		if (f) importFile(n, f);
+	});
+	return el;
+}
+
+async function importFile(n, file) {
+	try {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		const snap = await readSnapshot(bytes, file.name);
+		const s = card.slot(n);
+		if (s.valid && !confirm(`Slot ${n + 1} already holds a game. Put ${file.name} in its place?`)) return;
+		card.put(n, snap, file.name.replace(/\.[^.]*$/, '').slice(0, 32));
+		const old = $('grid').children[n];
+		old.replaceWith(slotView(n));
+		updateTop();
+		toast(`${file.name} is in slot ${n + 1} (${snap.model.name}).`);
+	} catch (err) {
+		toast(err.message);
+	}
+}
+
+async function openBytes(bytes, name, handle) {
+	const c = new Card(bytes, name);
+	const st = c.check();
+	if (st !== 'ok' && st !== 'blank') { toast(st); return; }
+	if (st === 'blank') { Card.writeHeader(bytes); c.dirty = true; toast('An empty card: it gets its header when saved.'); }
+	card = c;
+	cardHandle = handle || null;
+	render();
+}
+
+async function openCard() {
+	if (window.showOpenFilePicker) {
+		try {
+			const [h] = await showOpenFilePicker({ types: [{ description: 'Savestate card', accept: { 'application/octet-stream': ['.sav', '.vhd'] } }] });
+			const f = await h.getFile();
+			await openBytes(new Uint8Array(await f.arrayBuffer()), f.name, h);
+		} catch (e) { if (e.name !== 'AbortError') toast(e.message); }
+		return;
+	}
+	$('pickcard').value = '';
+	$('pickcard').click();
+}
+
+async function saveCard() {
+	if (!card) return;
+	try {
+		if (cardHandle && cardHandle.createWritable) {
+			const w = await cardHandle.createWritable();
+			await w.write(card.bytes);
+			await w.close();
+			toast('Card saved.');
+		} else if (window.showSaveFilePicker) {
+			const h = await showSaveFilePicker({ suggestedName: card.name });
+			const w = await h.createWritable();
+			await w.write(card.bytes);
+			await w.close();
+			cardHandle = h;
+			card.name = h.name;
+			toast('Card saved.');
+		} else {
+			download(card.bytes, card.name);
+			toast('Card downloaded: copy it to games/Spectrum on the SD card.');
+		}
+		card.dirty = false;
+		updateTop();
+	} catch (e) { if (e.name !== 'AbortError') toast(e.message); }
+}
+
+$('open').addEventListener('click', openCard);
+$('save').addEventListener('click', saveCard);
+$('new').addEventListener('click', () => $('newdlg').showModal());
+$('newdlg').addEventListener('close', () => {
+	if ($('newdlg').returnValue !== 'ok') return;
+	const n = Number($('newslots').value);
+	const bytes = Card.create(n);
+	card = new Card(bytes, 'savestates.sav');
+	card.dirty = true;
+	cardHandle = null;
+	render();
+	toast(`A card with ${n} slots. Save it, then copy it to games/Spectrum.`);
+});
+$('pokes').addEventListener('click', () => {
+	const pk = card.pokes;
+	$('pokestate').textContent = pk ? `This card has the POKEs of ${pk} games.` : 'This card has no POKEs.';
+	$('pokeremove').disabled = !pk;
+	$('pokedlg').showModal();
+});
+// the file picker needs the click itself
+$('pokechoose').addEventListener('click', () => { $('pickpokes').value = ''; $('pickpokes').click(); });
+$('pokeremove').addEventListener('click', () => { card.setPokes(null, null); render(); toast('The POKEs are gone from the card.'); });
+$('pickpokes').addEventListener('change', async (e) => {
+	try {
+		const files = [];
+		for (const f of e.target.files) {
+			const bytes = new Uint8Array(await f.arrayBuffer());
+			if (/\.zip$/i.test(f.name)) files.push(...await readZipPoks(bytes));
+			else files.push({ name: f.name, text: latin1(bytes) });
+		}
+		const r = buildPokes(files);
+		if (!r.games) { toast('No cheats in those files.'); return; }
+		card.setPokes(r.desc, r.db);
+		render();
+		toast(`POKEs of ${r.games} games, ${r.cheats} cheats. Save the card to keep them.`);
+	} catch (err) { toast(err.message); }
+});
+$('pickcard').addEventListener('change', async (e) => {
+	const f = e.target.files[0];
+	if (f) await openBytes(new Uint8Array(await f.arrayBuffer()), f.name, null);
+});
+$('picksnap').addEventListener('change', (e) => {
+	const f = e.target.files[0];
+	if (f && importTarget >= 0) importFile(importTarget, f);
+});
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', async (e) => {
+	e.preventDefault();
+	const item = e.dataTransfer.items && e.dataTransfer.items[0];
+	const f = e.dataTransfer.files[0];
+	if (!f) return;
+	if (/\.(z80|sna|szx)$/i.test(f.name)) { toast('Drop a snapshot on the slot it should go to.'); return; }
+	let handle = null;
+	if (item && item.getAsFileSystemHandle) { try { handle = await item.getAsFileSystemHandle(); } catch (_) {} }
+	await openBytes(new Uint8Array(await f.arrayBuffer()), f.name, handle);
+});
+window.addEventListener('beforeunload', (e) => { if (card && card.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+render();
+</script>
+</body>
+</html>
