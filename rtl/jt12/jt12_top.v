@@ -262,7 +262,9 @@ generate
            .CHANNEL_C(psg_C),
            .LEVEL_A(psg_lvl_A),
            .LEVEL_B(psg_lvl_B),
-           .LEVEL_C(psg_lvl_C)
+           .LEVEL_C(psg_lvl_C),
+           .IOA_in(8'hFF),
+           .IOB_in(8'hFF)
         );
         assign psg_snd = {2'b00, psg_A} + {2'b00, psg_B} + {2'b00, psg_C};
         assign snd_left  = fm_snd_left  + { 2'b0, psg_snd[9:1],5'd0}; 
