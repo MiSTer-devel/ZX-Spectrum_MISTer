@@ -1042,11 +1042,11 @@ wire        mouse_reg_sel;   // #FADF/#FBDF/#FFDF -> buttons/x/y, from A10:A8
 wire  [7:0] mouse_data;
 mouse mouse( .*, .reset(cold_reset), .addr(addr[10:8]), .sel(mouse_reg_sel), .dout(mouse_data), .btn_swap(status[35]), .wheel_inv(status[49]));
 
-// Joystick #1F and mouse #xxDF differ only in A7/A6, so each needs a full
-// low-byte compare; a six-bit one matches both
+// Joystick answers #1F/#5F/#9F/#DF like the real interface; an enabled mouse
+// takes #FADF/#FBDF/#FFDF
 wire       beta_port = &addr[4:0] & (~addr[7] | &addr[7:5]); // #1F #3F #5F #7F #FF
-wire       kemp_sel  = (addr[7:0] == 8'h1F) & ~(scorp & beta_port & scorp_1ffd[1]);
 wire       mouse_sel = |status[35:34] & (addr[7:0] == 8'hDF) & mouse_reg_sel;
+wire       kemp_sel  = (addr[5:0] == 6'h1F) & ~mouse_sel & ~(scorp & beta_port & scorp_1ffd[1]);
 reg  [7:0] kemp_dout;
 always @(posedge clk_sys) kemp_dout <= mouse_sel ? mouse_data : {2'b00, joyk};
 
