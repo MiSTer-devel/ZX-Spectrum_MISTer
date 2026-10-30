@@ -1428,6 +1428,8 @@ smart_tape tape
 	.tape_mode(ioctl_index[7:6]),
 
 	.m1(~nM1 & ~nMREQ),
+	.ula_rd(io_rd & ~addr[0]),
+	.reg_b(cpu_reg[95:88]),
 	.rom_en(active_48_rom & ~ss_active),
 	.dout_en(tape_dout_en),
 	.dout(tape_dout)
