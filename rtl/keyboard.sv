@@ -161,6 +161,10 @@ wire shift = mod[0] | left_shift;
 reg  right_ctrl = 0;
 wire ctrl = mod[2] | right_ctrl;
 
+// held keys that add CAPS SHIFT: Esc, Caps lock, Backspace, Right, Up, Down, Left
+reg  [6:0] caps_keys = 0;
+wire [6:0] caps_key = {code == 8'h76, code == 8'h58, code == 8'h66, code == 8'h74, code == 8'h75, code == 8'h72, code == 8'h6B};
+
 always @(posedge clk_sys) begin
 	reg old_reset = 0;
 	old_reset <= reset;
@@ -176,6 +180,7 @@ always @(posedge clk_sys) begin
 		keys[7] <= 5'b11111;
 		left_shift <= 0;
 		right_ctrl <= 0;
+		caps_keys  <= 0;
 	end
 
 	if(input_strobe) begin
@@ -219,6 +224,7 @@ always @(posedge clk_sys) begin
 					8'h76 : begin // Escape (CAPS SPACE)
 							keys[0][0] <= 0; // CAPS SHIFT on
 							keys[7][1] <= 1; // SYMBOL SHIFT off
+							caps_keys  <= caps_keys | caps_key;
 						end
 
 					// keys that add SYMBOL SHIFT and remove CAPS SHIFT
@@ -247,10 +253,15 @@ always @(posedge clk_sys) begin
 					// only sets CAPS SHIFT and SYMBOL SHIFT on shift or ctrl release
 					// fixes fast alternating between left cursor and right cursor giving 5s and 8s
 					8'h12: begin // left shift
-							keys[0][0] <= ~mod[0]; // CAPS SHIFT
+							keys[0][0] <= ~(mod[0] | |caps_keys); // CAPS SHIFT
 						end
 					8'h59: begin // right shift
-							keys[0][0] <= ~left_shift; // CAPS SHIFT
+							keys[0][0] <= ~(left_shift | |caps_keys); // CAPS SHIFT
+						end
+					// release CAPS SHIFT with the last held key that added it
+					8'h6B, 8'h72, 8'h75, 8'h74, 8'h66, 8'h58, 8'h76: begin
+							keys[0][0] <= ~(shift | |(caps_keys & ~caps_key)); // CAPS SHIFT
+							caps_keys  <= caps_keys & ~caps_key;
 						end
 					8'h14: begin
 							if (~extended) begin // left ctrl
