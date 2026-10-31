@@ -48,6 +48,7 @@ module tape
 	input   [1:0] tape_mode, //0 - TAP, 1 - CSW, 2 - TZX, 3 - PZX
 	input  [24:0] tape_size,
 	input         stdload,
+	input         loader,
 	input         req_hdr,
 
 	output reg    audio_out,
@@ -271,7 +272,7 @@ always @(posedge clk_sys) begin
 	end else if(ce) begin
 
 		old_stdload <= stdload;
-		if((stdload | turbo) & ~auto_blk) play_pause <= 0;
+		if((stdload | loader | turbo) & ~auto_blk) play_pause <= 0;
 
 		old_pause <= pause;
 		if(pause & ~old_pause & ~turbo) begin
@@ -517,6 +518,8 @@ module smart_tape
 
 	input  [15:0] addr,
 	input         m1,
+	input         ula_rd,
+	input   [7:0] reg_b,
 	input         rom_en,
 	output        dout_en,
 	output  [7:0] dout
@@ -555,10 +558,16 @@ tape tape
 wire tape_ld1 = ((addr >= 'h5CA) & (addr < 'h5D8) & rom_en & turbo);
 wire tape_ld2 = ((addr >= 'h56C) & (addr < 'h58F) & rom_en & turbo);
 
+reg  [8:0] ld_gap = '1;
+reg  [7:0] ld_b;
+reg  [3:0] ld_cnt;
+wire       loader = (ld_cnt > 10) & ~&ld_gap;
+
 always @(posedge clk_sys) begin
 	reg old_m1;
 	reg old_download;
 	reg allow_turbo;
+	reg old_ula_rd;
 
 	old_m1 <= m1;
 	old_download <= ioctl_download;
@@ -576,6 +585,19 @@ always @(posedge clk_sys) begin
 			byte_wait <= 0;
 		end
 		if(!tape_ld1) tape_stub[1] <= 'hFE;
+	end
+
+	// Custom loader: ULA port reads less than ~500T apart with B stepping by one
+	old_ula_rd <= ula_rd;
+	if(ce & ~&ld_gap) ld_gap <= ld_gap + 1'd1;
+	if(ula_rd & ~old_ula_rd) begin
+		ld_gap <= 0;
+		ld_b   <= reg_b;
+		if(~&ld_gap & ((reg_b == ld_b + 1'd1) | (reg_b == ld_b - 1'd1))) begin
+			if(~&ld_cnt) ld_cnt <= ld_cnt + 1'd1;
+		end else begin
+			ld_cnt <= 0;
+		end
 	end
 
 	if(reset | (prev & next) | ioctl_download) {tape_ready, allow_turbo} <= 0;
